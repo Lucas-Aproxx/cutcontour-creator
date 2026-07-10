@@ -3,8 +3,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { addCutContour, type CutShape, type ShapeType } from "@/lib/cutcontour";
-import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers } from "lucide-react";
+import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus } from "lucide-react";
 
 // pdf.js
 import * as pdfjsLib from "pdfjs-dist/build/pdf.mjs";
@@ -16,6 +18,32 @@ interface PageDims {
   height: number;
 }
 
+const PT_PER_MM = 72 / 25.4;
+
+interface Preset {
+  id: string;
+  name: string;
+  type: ShapeType;
+  wMm: number;
+  hMm: number;
+}
+
+const PRESETS_KEY = "cutcontour.presets.v1";
+
+function loadPresets(): Preset[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function savePresets(p: Preset[]) {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(p));
+}
+
 export function CutContourEditor() {
   const [fileBytes, setFileBytes] = useState<ArrayBuffer | null>(null);
   const [fileName, setFileName] = useState<string>("");
@@ -23,13 +51,22 @@ export function CutContourEditor() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(0);
   const [pageDims, setPageDims] = useState<PageDims>({ width: 0, height: 0 });
+  // Page size in PDF points (per page index)
+  const [pageSizesPt, setPageSizesPt] = useState<Record<number, PageDims>>({});
   const [shapes, setShapes] = useState<CutShape[]>([]);
   const [tool, setTool] = useState<ShapeType>("rect");
   const [drawing, setDrawing] = useState<null | { startX: number; startY: number; curX: number; curY: number }>(null);
   const [exporting, setExporting] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [newPresetName, setNewPresetName] = useState("");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPresets(loadPresets());
+  }, []);
 
   const onFile = useCallback(async (file: File) => {
     if (file.type !== "application/pdf") {
@@ -40,11 +77,19 @@ export function CutContourEditor() {
     setFileBytes(buf);
     setFileName(file.name);
     setShapes([]);
+    setSelectedId(null);
     setPageIndex(0);
-    // Clone for pdf.js (it detaches the buffer)
     const doc = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
     setPdfDoc(doc);
     setPageCount(doc.numPages);
+    // Precompute page sizes in points
+    const sizes: Record<number, PageDims> = {};
+    for (let i = 1; i <= doc.numPages; i++) {
+      const p = await doc.getPage(i);
+      const vp = p.getViewport({ scale: 1 });
+      sizes[i - 1] = { width: vp.width, height: vp.height };
+    }
+    setPageSizesPt(sizes);
   }, []);
 
   // Render current page
@@ -54,7 +99,6 @@ export function CutContourEditor() {
     (async () => {
       const page = await pdfDoc.getPage(pageIndex + 1);
       const viewport = page.getViewport({ scale: 1 });
-      // Fit to ~900px wide
       const targetWidth = Math.min(900, window.innerWidth - 420);
       const scale = targetWidth / viewport.width;
       const scaled = page.getViewport({ scale });
@@ -95,13 +139,41 @@ export function CutContourEditor() {
     const h = Math.abs(drawing.curY - drawing.startY);
     setDrawing(null);
     if (w < 0.005 || h < 0.005) return;
-    setShapes((s) => [
-      ...s,
-      { id: crypto.randomUUID(), page: pageIndex, type: tool, x, y, w, h },
-    ]);
+    const id = crypto.randomUUID();
+    setShapes((s) => [...s, { id, page: pageIndex, type: tool, x, y, w, h }]);
+    setSelectedId(id);
   };
 
   const pageShapes = shapes.filter((s) => s.page === pageIndex);
+  const selected = shapes.find((s) => s.id === selectedId) ?? null;
+
+  // Helpers to convert normalized <-> mm using page size in points
+  const pageSize = pageSizesPt[pageIndex] ?? { width: 595, height: 842 };
+  const pageWmm = pageSize.width / PT_PER_MM;
+  const pageHmm = pageSize.height / PT_PER_MM;
+
+  const updateSelectedMm = (patch: { xMm?: number; yMm?: number; wMm?: number; hMm?: number }) => {
+    if (!selected) return;
+    setShapes((all) =>
+      all.map((s) => {
+        if (s.id !== selected.id) return s;
+        const size = pageSizesPt[s.page] ?? pageSize;
+        const pW = size.width / PT_PER_MM;
+        const pH = size.height / PT_PER_MM;
+        const xMm = patch.xMm ?? s.x * pW;
+        const yMm = patch.yMm ?? s.y * pH;
+        const wMm = patch.wMm ?? s.w * pW;
+        const hMm = patch.hMm ?? s.h * pH;
+        return {
+          ...s,
+          x: Math.max(0, Math.min(1, xMm / pW)),
+          y: Math.max(0, Math.min(1, yMm / pH)),
+          w: Math.max(0, Math.min(1, wMm / pW)),
+          h: Math.max(0, Math.min(1, hMm / pH)),
+        };
+      }),
+    );
+  };
 
   const handleExport = async () => {
     if (!fileBytes) return;
@@ -124,6 +196,50 @@ export function CutContourEditor() {
     }
   };
 
+  const saveSelectedAsPreset = () => {
+    if (!selected) return;
+    const name = newPresetName.trim() || `Contour ${Math.round(selected.w * pageWmm)}×${Math.round(selected.h * pageHmm)}mm`;
+    const size = pageSizesPt[selected.page] ?? pageSize;
+    const preset: Preset = {
+      id: crypto.randomUUID(),
+      name,
+      type: selected.type,
+      wMm: selected.w * (size.width / PT_PER_MM),
+      hMm: selected.h * (size.height / PT_PER_MM),
+    };
+    const next = [...presets, preset];
+    setPresets(next);
+    savePresets(next);
+    setNewPresetName("");
+    toast.success("Preset opgeslagen");
+  };
+
+  const applyPreset = (preset: Preset) => {
+    const id = crypto.randomUUID();
+    const wNorm = (preset.wMm * PT_PER_MM) / pageSize.width;
+    const hNorm = (preset.hMm * PT_PER_MM) / pageSize.height;
+    setShapes((s) => [
+      ...s,
+      {
+        id,
+        page: pageIndex,
+        type: preset.type,
+        x: Math.max(0, 0.5 - wNorm / 2),
+        y: Math.max(0, 0.5 - hNorm / 2),
+        w: Math.min(1, wNorm),
+        h: Math.min(1, hNorm),
+      },
+    ]);
+    setSelectedId(id);
+    toast.success(`Preset "${preset.name}" toegevoegd`);
+  };
+
+  const deletePreset = (id: string) => {
+    const next = presets.filter((p) => p.id !== id);
+    setPresets(next);
+    savePresets(next);
+  };
+
   const rectPreview = drawing
     ? {
         left: Math.min(drawing.startX, drawing.curX) * 100 + "%",
@@ -132,6 +248,12 @@ export function CutContourEditor() {
         height: Math.abs(drawing.curY - drawing.startY) * 100 + "%",
       }
     : null;
+
+  const selSize = selected ? pageSizesPt[selected.page] ?? pageSize : null;
+  const selWmm = selSize && selected ? selected.w * (selSize.width / PT_PER_MM) : 0;
+  const selHmm = selSize && selected ? selected.h * (selSize.height / PT_PER_MM) : 0;
+  const selXmm = selSize && selected ? selected.x * (selSize.width / PT_PER_MM) : 0;
+  const selYmm = selSize && selected ? selected.y * (selSize.height / PT_PER_MM) : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -170,7 +292,7 @@ export function CutContourEditor() {
         </div>
       </header>
 
-      <main className="max-w-[1400px] mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+      <main className="max-w-[1400px] mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         <section>
           {!fileBytes ? (
             <label className="block">
@@ -190,7 +312,7 @@ export function CutContourEditor() {
             </label>
           ) : (
             <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <Button
                     variant={tool === "rect" ? "default" : "outline"}
@@ -208,6 +330,9 @@ export function CutContourEditor() {
                   </Button>
                 </div>
                 <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Pagina {Math.round(pageWmm)}×{Math.round(pageHmm)} mm
+                  </span>
                   <Button
                     variant="outline"
                     size="icon"
@@ -244,14 +369,19 @@ export function CutContourEditor() {
                   {pageShapes.map((s) => (
                     <div
                       key={s.id}
-                      className="absolute border-2 pointer-events-none"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(s.id);
+                      }}
+                      className="absolute border-2"
                       style={{
                         left: s.x * 100 + "%",
                         top: s.y * 100 + "%",
                         width: s.w * 100 + "%",
                         height: s.h * 100 + "%",
-                        borderColor: "oklch(0.65 0.28 350)",
+                        borderColor: selectedId === s.id ? "oklch(0.7 0.3 30)" : "oklch(0.65 0.28 350)",
                         borderRadius: s.type === "ellipse" ? "50%" : 0,
+                        boxShadow: selectedId === s.id ? "0 0 0 2px oklch(0.7 0.3 30 / 0.3)" : undefined,
                       }}
                     />
                   ))}
@@ -268,50 +398,110 @@ export function CutContourEditor() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-3">
-                Sleep op de pagina om een snijlijn te tekenen. Snijlijnen worden geëxporteerd als spot-kleur "Cutcontour" (CMYK 0/100/0/0) in een aparte laag.
+                Teken op de pagina of gebruik een preset. Klik een contour om exacte afmetingen in mm in te stellen.
               </p>
             </Card>
           )}
         </section>
 
         <aside className="space-y-4">
+          {selected && (
+            <Card className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
+                <h2 className="font-semibold">Afmetingen (mm)</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">X</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={Number(selXmm.toFixed(2))}
+                    onChange={(e) => updateSelectedMm({ xMm: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Y</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={Number(selYmm.toFixed(2))}
+                    onChange={(e) => updateSelectedMm({ yMm: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">L (breedte)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={Number(selWmm.toFixed(2))}
+                    onChange={(e) => updateSelectedMm({ wMm: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">B (hoogte)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={Number(selHmm.toFixed(2))}
+                    onChange={(e) => updateSelectedMm({ hMm: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Input
+                  placeholder="Preset naam..."
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                />
+                <Button size="sm" variant="outline" onClick={saveSelectedAsPreset}>
+                  <Save className="w-4 h-4 mr-1" /> Opslaan
+                </Button>
+              </div>
+            </Card>
+          )}
+
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Layers className="w-4 h-4 text-primary" />
-              <h2 className="font-semibold">Cutcontouren</h2>
-              <Badge variant="secondary" className="ml-auto">
-                {shapes.length}
-              </Badge>
+              <Save className="w-4 h-4 text-primary" />
+              <h2 className="font-semibold">Presets</h2>
+              <Badge variant="secondary" className="ml-auto">{presets.length}</Badge>
             </div>
-            {shapes.length === 0 ? (
+            {presets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nog geen snijlijnen toegevoegd.
+                Nog geen presets. Selecteer een contour en klik "Opslaan".
               </p>
             ) : (
-              <ul className="space-y-2 max-h-[500px] overflow-y-auto">
-                {shapes.map((s, i) => (
-                  <li
-                    key={s.id}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-muted"
-                  >
-                    {s.type === "rect" ? (
+              <ul className="space-y-2 max-h-[240px] overflow-y-auto">
+                {presets.map((p) => (
+                  <li key={p.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted">
+                    {p.type === "rect" ? (
                       <Square className="w-4 h-4 text-primary shrink-0" />
                     ) : (
                       <Circle className="w-4 h-4 text-primary shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">Contour {i + 1}</p>
+                      <p className="text-sm font-medium truncate">{p.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        Pagina {s.page + 1} · {Math.round(s.w * 100)}×{Math.round(s.h * 100)}%
+                        {p.wMm.toFixed(1)} × {p.hMm.toFixed(1)} mm
                       </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="w-7 h-7"
-                      onClick={() =>
-                        setShapes((all) => all.filter((x) => x.id !== s.id))
-                      }
+                      disabled={!fileBytes}
+                      onClick={() => applyPreset(p)}
+                      title="Toevoegen aan pagina"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-7 h-7"
+                      onClick={() => deletePreset(p.id)}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -321,11 +511,56 @@ export function CutContourEditor() {
             )}
           </Card>
 
-          <Card className="p-4 text-sm space-y-2">
-            <h3 className="font-semibold">Afdruknorm</h3>
-            <p className="text-muted-foreground">
-              De export bevat een aparte laag met de naam <strong>Cutcontour</strong> als spot-kleur op basis van CMYK 0/100/0/0. Zo herkennen drukkerij en snijplotter de snijlijn automatisch.
-            </p>
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Layers className="w-4 h-4 text-primary" />
+              <h2 className="font-semibold">Cutcontouren</h2>
+              <Badge variant="secondary" className="ml-auto">{shapes.length}</Badge>
+            </div>
+            {shapes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nog geen snijlijnen toegevoegd.</p>
+            ) : (
+              <ul className="space-y-2 max-h-[300px] overflow-y-auto">
+                {shapes.map((s, i) => {
+                  const sz = pageSizesPt[s.page] ?? pageSize;
+                  const wmm = s.w * (sz.width / PT_PER_MM);
+                  const hmm = s.h * (sz.height / PT_PER_MM);
+                  return (
+                    <li
+                      key={s.id}
+                      onClick={() => setSelectedId(s.id)}
+                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${
+                        selectedId === s.id ? "bg-primary/10 ring-1 ring-primary" : "bg-muted"
+                      }`}
+                    >
+                      {s.type === "rect" ? (
+                        <Square className="w-4 h-4 text-primary shrink-0" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-primary shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">Contour {i + 1}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Pagina {s.page + 1} · {wmm.toFixed(1)}×{hmm.toFixed(1)} mm
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-7 h-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShapes((all) => all.filter((x) => x.id !== s.id));
+                          if (selectedId === s.id) setSelectedId(null);
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </Card>
         </aside>
       </main>
