@@ -7,11 +7,10 @@ import { addCutContour, type CutShape, type ShapeType } from "@/lib/cutcontour";
 import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers } from "lucide-react";
 
 // pdf.js
-// @ts-expect-error no types for legacy build worker path
 import * as pdfjsLib from "pdfjs-dist/build/pdf.mjs";
-// @ts-expect-error worker url
+// @ts-expect-error worker url import
 import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = pdfWorker;
 
 interface PageDims {
   width: number;
