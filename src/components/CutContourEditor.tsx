@@ -20,15 +20,21 @@ interface PageDims {
 
 const PT_PER_MM = 72 / 25.4;
 
-interface Preset {
-  id: string;
-  name: string;
+interface PresetShape {
   type: ShapeType;
+  xMm: number;
+  yMm: number;
   wMm: number;
   hMm: number;
 }
 
-const PRESETS_KEY = "cutcontour.presets.v1";
+interface Preset {
+  id: string;
+  name: string;
+  shapes: PresetShape[];
+}
+
+const PRESETS_KEY = "cutcontour.presets.v2";
 
 function loadPresets(): Preset[] {
   try {
