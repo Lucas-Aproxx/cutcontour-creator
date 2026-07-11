@@ -249,9 +249,15 @@ export function CutContourEditor() {
   };
 
   const deletePreset = (id: string) => {
-    const next = presets.filter((p) => p.id !== id);
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    if (!window.confirm(`Preset "${p.name}" definitief verwijderen? Dit heeft geen invloed op de contouren die momenteel op de pagina staan.`)) {
+      return;
+    }
+    const next = presets.filter((x) => x.id !== id);
     setPresets(next);
     savePresets(next);
+    toast.success(`Preset "${p.name}" verwijderd`);
   };
 
   const rectPreview = drawing
