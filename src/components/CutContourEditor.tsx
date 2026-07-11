@@ -490,15 +490,11 @@ export function CutContourEditor() {
               <ul className="space-y-2 max-h-[240px] overflow-y-auto">
                 {presets.map((p) => (
                   <li key={p.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted">
-                    {p.type === "rect" ? (
-                      <Square className="w-4 h-4 text-primary shrink-0" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-primary shrink-0" />
-                    )}
+                    <Layers className="w-4 h-4 text-primary shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{p.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {p.wMm.toFixed(1)} × {p.hMm.toFixed(1)} mm
+                        {p.shapes.length} contour{p.shapes.length === 1 ? "" : "en"}
                       </p>
                     </div>
                     <Button
