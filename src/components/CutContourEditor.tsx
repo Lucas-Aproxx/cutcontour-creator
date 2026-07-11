@@ -202,42 +202,50 @@ export function CutContourEditor() {
     }
   };
 
-  const saveSelectedAsPreset = () => {
-    if (!selected) return;
-    const name = newPresetName.trim() || `Contour ${Math.round(selected.w * pageWmm)}×${Math.round(selected.h * pageHmm)}mm`;
-    const size = pageSizesPt[selected.page] ?? pageSize;
+  const saveCurrentPageAsPreset = () => {
+    if (pageShapes.length === 0) {
+      toast.error("Geen contouren op deze pagina om op te slaan");
+      return;
+    }
+    const name = newPresetName.trim() || `Preset ${presets.length + 1} (${pageShapes.length} contouren)`;
     const preset: Preset = {
       id: crypto.randomUUID(),
       name,
-      type: selected.type,
-      wMm: selected.w * (size.width / PT_PER_MM),
-      hMm: selected.h * (size.height / PT_PER_MM),
+      shapes: pageShapes.map((s) => {
+        const size = pageSizesPt[s.page] ?? pageSize;
+        const pW = size.width / PT_PER_MM;
+        const pH = size.height / PT_PER_MM;
+        return {
+          type: s.type,
+          xMm: s.x * pW,
+          yMm: s.y * pH,
+          wMm: s.w * pW,
+          hMm: s.h * pH,
+        };
+      }),
     };
     const next = [...presets, preset];
     setPresets(next);
     savePresets(next);
     setNewPresetName("");
-    toast.success("Preset opgeslagen");
+    toast.success(`Preset opgeslagen (${preset.shapes.length} contouren)`);
   };
 
   const applyPreset = (preset: Preset) => {
-    const id = crypto.randomUUID();
-    const wNorm = (preset.wMm * PT_PER_MM) / pageSize.width;
-    const hNorm = (preset.hMm * PT_PER_MM) / pageSize.height;
-    setShapes((s) => [
-      ...s,
-      {
-        id,
-        page: pageIndex,
-        type: preset.type,
-        x: Math.max(0, 0.5 - wNorm / 2),
-        y: Math.max(0, 0.5 - hNorm / 2),
-        w: Math.min(1, wNorm),
-        h: Math.min(1, hNorm),
-      },
-    ]);
-    setSelectedId(id);
-    toast.success(`Preset "${preset.name}" toegevoegd`);
+    const pW = pageSize.width / PT_PER_MM;
+    const pH = pageSize.height / PT_PER_MM;
+    const added: CutShape[] = preset.shapes.map((ps) => ({
+      id: crypto.randomUUID(),
+      page: pageIndex,
+      type: ps.type,
+      x: Math.max(0, Math.min(1, ps.xMm / pW)),
+      y: Math.max(0, Math.min(1, ps.yMm / pH)),
+      w: Math.max(0, Math.min(1, ps.wMm / pW)),
+      h: Math.max(0, Math.min(1, ps.hMm / pH)),
+    }));
+    setShapes((s) => [...s, ...added]);
+    setSelectedId(added[added.length - 1]?.id ?? null);
+    toast.success(`Preset "${preset.name}" toegevoegd (${added.length} contouren)`);
   };
 
   const deletePreset = (id: string) => {
