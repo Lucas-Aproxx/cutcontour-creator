@@ -469,8 +469,8 @@ export function CutContourEditor() {
                   value={newPresetName}
                   onChange={(e) => setNewPresetName(e.target.value)}
                 />
-                <Button size="sm" variant="outline" onClick={saveSelectedAsPreset}>
-                  <Save className="w-4 h-4 mr-1" /> Opslaan
+                <Button size="sm" variant="outline" onClick={saveCurrentPageAsPreset}>
+                  <Save className="w-4 h-4 mr-1" /> Pagina opslaan
                 </Button>
               </div>
             </Card>
