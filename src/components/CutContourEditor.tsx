@@ -482,9 +482,19 @@ export function CutContourEditor() {
               <h2 className="font-semibold">Presets</h2>
               <Badge variant="secondary" className="ml-auto">{presets.length}</Badge>
             </div>
+            <div className="flex gap-2 mb-3">
+              <Input
+                placeholder="Preset naam..."
+                value={newPresetName}
+                onChange={(e) => setNewPresetName(e.target.value)}
+              />
+              <Button size="sm" variant="outline" onClick={saveCurrentPageAsPreset} disabled={pageShapes.length === 0}>
+                <Save className="w-4 h-4 mr-1" /> Pagina opslaan
+              </Button>
+            </div>
             {presets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nog geen presets. Selecteer een contour en klik "Opslaan".
+                Nog geen presets. Teken contouren en klik "Pagina opslaan" om alle contouren op deze pagina als preset te bewaren.
               </p>
             ) : (
               <ul className="space-y-2 max-h-[240px] overflow-y-auto">
