@@ -20,15 +20,21 @@ interface PageDims {
 
 const PT_PER_MM = 72 / 25.4;
 
-interface Preset {
-  id: string;
-  name: string;
+interface PresetShape {
   type: ShapeType;
+  xMm: number;
+  yMm: number;
   wMm: number;
   hMm: number;
 }
 
-const PRESETS_KEY = "cutcontour.presets.v1";
+interface Preset {
+  id: string;
+  name: string;
+  shapes: PresetShape[];
+}
+
+const PRESETS_KEY = "cutcontour.presets.v2";
 
 function loadPresets(): Preset[] {
   try {
@@ -196,42 +202,50 @@ export function CutContourEditor() {
     }
   };
 
-  const saveSelectedAsPreset = () => {
-    if (!selected) return;
-    const name = newPresetName.trim() || `Contour ${Math.round(selected.w * pageWmm)}×${Math.round(selected.h * pageHmm)}mm`;
-    const size = pageSizesPt[selected.page] ?? pageSize;
+  const saveCurrentPageAsPreset = () => {
+    if (pageShapes.length === 0) {
+      toast.error("Geen contouren op deze pagina om op te slaan");
+      return;
+    }
+    const name = newPresetName.trim() || `Preset ${presets.length + 1} (${pageShapes.length} contouren)`;
     const preset: Preset = {
       id: crypto.randomUUID(),
       name,
-      type: selected.type,
-      wMm: selected.w * (size.width / PT_PER_MM),
-      hMm: selected.h * (size.height / PT_PER_MM),
+      shapes: pageShapes.map((s) => {
+        const size = pageSizesPt[s.page] ?? pageSize;
+        const pW = size.width / PT_PER_MM;
+        const pH = size.height / PT_PER_MM;
+        return {
+          type: s.type,
+          xMm: s.x * pW,
+          yMm: s.y * pH,
+          wMm: s.w * pW,
+          hMm: s.h * pH,
+        };
+      }),
     };
     const next = [...presets, preset];
     setPresets(next);
     savePresets(next);
     setNewPresetName("");
-    toast.success("Preset opgeslagen");
+    toast.success(`Preset opgeslagen (${preset.shapes.length} contouren)`);
   };
 
   const applyPreset = (preset: Preset) => {
-    const id = crypto.randomUUID();
-    const wNorm = (preset.wMm * PT_PER_MM) / pageSize.width;
-    const hNorm = (preset.hMm * PT_PER_MM) / pageSize.height;
-    setShapes((s) => [
-      ...s,
-      {
-        id,
-        page: pageIndex,
-        type: preset.type,
-        x: Math.max(0, 0.5 - wNorm / 2),
-        y: Math.max(0, 0.5 - hNorm / 2),
-        w: Math.min(1, wNorm),
-        h: Math.min(1, hNorm),
-      },
-    ]);
-    setSelectedId(id);
-    toast.success(`Preset "${preset.name}" toegevoegd`);
+    const pW = pageSize.width / PT_PER_MM;
+    const pH = pageSize.height / PT_PER_MM;
+    const added: CutShape[] = preset.shapes.map((ps) => ({
+      id: crypto.randomUUID(),
+      page: pageIndex,
+      type: ps.type,
+      x: Math.max(0, Math.min(1, ps.xMm / pW)),
+      y: Math.max(0, Math.min(1, ps.yMm / pH)),
+      w: Math.max(0, Math.min(1, ps.wMm / pW)),
+      h: Math.max(0, Math.min(1, ps.hMm / pH)),
+    }));
+    setShapes((s) => [...s, ...added]);
+    setSelectedId(added[added.length - 1]?.id ?? null);
+    toast.success(`Preset "${preset.name}" toegevoegd (${added.length} contouren)`);
   };
 
   const deletePreset = (id: string) => {
@@ -455,8 +469,8 @@ export function CutContourEditor() {
                   value={newPresetName}
                   onChange={(e) => setNewPresetName(e.target.value)}
                 />
-                <Button size="sm" variant="outline" onClick={saveSelectedAsPreset}>
-                  <Save className="w-4 h-4 mr-1" /> Opslaan
+                <Button size="sm" variant="outline" onClick={saveCurrentPageAsPreset}>
+                  <Save className="w-4 h-4 mr-1" /> Pagina opslaan
                 </Button>
               </div>
             </Card>
@@ -468,23 +482,29 @@ export function CutContourEditor() {
               <h2 className="font-semibold">Presets</h2>
               <Badge variant="secondary" className="ml-auto">{presets.length}</Badge>
             </div>
+            <div className="flex gap-2 mb-3">
+              <Input
+                placeholder="Preset naam..."
+                value={newPresetName}
+                onChange={(e) => setNewPresetName(e.target.value)}
+              />
+              <Button size="sm" variant="outline" onClick={saveCurrentPageAsPreset} disabled={pageShapes.length === 0}>
+                <Save className="w-4 h-4 mr-1" /> Pagina opslaan
+              </Button>
+            </div>
             {presets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nog geen presets. Selecteer een contour en klik "Opslaan".
+                Nog geen presets. Teken contouren en klik "Pagina opslaan" om alle contouren op deze pagina als preset te bewaren.
               </p>
             ) : (
               <ul className="space-y-2 max-h-[240px] overflow-y-auto">
                 {presets.map((p) => (
                   <li key={p.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted">
-                    {p.type === "rect" ? (
-                      <Square className="w-4 h-4 text-primary shrink-0" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-primary shrink-0" />
-                    )}
+                    <Layers className="w-4 h-4 text-primary shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{p.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {p.wMm.toFixed(1)} × {p.hMm.toFixed(1)} mm
+                        {p.shapes.length} contour{p.shapes.length === 1 ? "" : "en"}
                       </p>
                     </div>
                     <Button
