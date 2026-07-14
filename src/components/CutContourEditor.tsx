@@ -166,16 +166,25 @@ export function CutContourEditor() {
         const size = pageSizesPt[s.page] ?? pageSize;
         const pW = size.width / PT_PER_MM;
         const pH = size.height / PT_PER_MM;
-        const xMm = patch.xMm ?? s.x * pW;
-        const yMm = patch.yMm ?? s.y * pH;
-        const wMm = patch.wMm ?? s.w * pW;
-        const hMm = patch.hMm ?? s.h * pH;
+        // Current values in mm; for ellipse, X/Y represent the CENTER
+        const isEllipse = s.type === "ellipse";
+        const curWmm = s.w * pW;
+        const curHmm = s.h * pH;
+        const curXmm = s.x * pW + (isEllipse ? curWmm / 2 : 0);
+        const curYmm = s.y * pH + (isEllipse ? curHmm / 2 : 0);
+        const nextXmm = patch.xMm ?? curXmm;
+        const nextYmm = patch.yMm ?? curYmm;
+        const nextWmm = patch.wMm ?? curWmm;
+        const nextHmm = patch.hMm ?? curHmm;
+        // Convert back to top-left for storage
+        const xTopMm = nextXmm - (isEllipse ? nextWmm / 2 : 0);
+        const yTopMm = nextYmm - (isEllipse ? nextHmm / 2 : 0);
         return {
           ...s,
-          x: Math.max(0, Math.min(1, xMm / pW)),
-          y: Math.max(0, Math.min(1, yMm / pH)),
-          w: Math.max(0, Math.min(1, wMm / pW)),
-          h: Math.max(0, Math.min(1, hMm / pH)),
+          x: Math.max(0, Math.min(1, xTopMm / pW)),
+          y: Math.max(0, Math.min(1, yTopMm / pH)),
+          w: Math.max(0, Math.min(1, nextWmm / pW)),
+          h: Math.max(0, Math.min(1, nextHmm / pH)),
         };
       }),
     );
@@ -272,8 +281,11 @@ export function CutContourEditor() {
   const selSize = selected ? pageSizesPt[selected.page] ?? pageSize : null;
   const selWmm = selSize && selected ? selected.w * (selSize.width / PT_PER_MM) : 0;
   const selHmm = selSize && selected ? selected.h * (selSize.height / PT_PER_MM) : 0;
-  const selXmm = selSize && selected ? selected.x * (selSize.width / PT_PER_MM) : 0;
-  const selYmm = selSize && selected ? selected.y * (selSize.height / PT_PER_MM) : 0;
+  const selXmmRaw = selSize && selected ? selected.x * (selSize.width / PT_PER_MM) : 0;
+  const selYmmRaw = selSize && selected ? selected.y * (selSize.height / PT_PER_MM) : 0;
+  const selIsEllipse = selected?.type === "ellipse";
+  const selXmm = selXmmRaw + (selIsEllipse ? selWmm / 2 : 0);
+  const selYmm = selYmmRaw + (selIsEllipse ? selHmm / 2 : 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -430,10 +442,13 @@ export function CutContourEditor() {
               <div className="flex items-center gap-2">
                 {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
                 <h2 className="font-semibold">Afmetingen (mm)</h2>
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  {selIsEllipse ? "X/Y = midden" : "X/Y = linksboven"}
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">X</Label>
+                  <Label className="text-xs">X {selIsEllipse ? "(midden)" : ""}</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -442,7 +457,7 @@ export function CutContourEditor() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Y</Label>
+                  <Label className="text-xs">Y {selIsEllipse ? "(midden)" : ""}</Label>
                   <Input
                     type="number"
                     step="0.1"
