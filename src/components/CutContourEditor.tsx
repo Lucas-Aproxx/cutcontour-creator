@@ -442,10 +442,13 @@ export function CutContourEditor() {
               <div className="flex items-center gap-2">
                 {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
                 <h2 className="font-semibold">Afmetingen (mm)</h2>
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  {selIsEllipse ? "X/Y = midden" : "X/Y = linksboven"}
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">X</Label>
+                  <Label className="text-xs">X {selIsEllipse ? "(midden)" : ""}</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -454,7 +457,7 @@ export function CutContourEditor() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Y</Label>
+                  <Label className="text-xs">Y {selIsEllipse ? "(midden)" : ""}</Label>
                   <Input
                     type="number"
                     step="0.1"
