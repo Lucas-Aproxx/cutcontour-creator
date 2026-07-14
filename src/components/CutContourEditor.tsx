@@ -166,16 +166,25 @@ export function CutContourEditor() {
         const size = pageSizesPt[s.page] ?? pageSize;
         const pW = size.width / PT_PER_MM;
         const pH = size.height / PT_PER_MM;
-        const xMm = patch.xMm ?? s.x * pW;
-        const yMm = patch.yMm ?? s.y * pH;
-        const wMm = patch.wMm ?? s.w * pW;
-        const hMm = patch.hMm ?? s.h * pH;
+        // Current values in mm; for ellipse, X/Y represent the CENTER
+        const isEllipse = s.type === "ellipse";
+        const curWmm = s.w * pW;
+        const curHmm = s.h * pH;
+        const curXmm = s.x * pW + (isEllipse ? curWmm / 2 : 0);
+        const curYmm = s.y * pH + (isEllipse ? curHmm / 2 : 0);
+        const nextXmm = patch.xMm ?? curXmm;
+        const nextYmm = patch.yMm ?? curYmm;
+        const nextWmm = patch.wMm ?? curWmm;
+        const nextHmm = patch.hMm ?? curHmm;
+        // Convert back to top-left for storage
+        const xTopMm = nextXmm - (isEllipse ? nextWmm / 2 : 0);
+        const yTopMm = nextYmm - (isEllipse ? nextHmm / 2 : 0);
         return {
           ...s,
-          x: Math.max(0, Math.min(1, xMm / pW)),
-          y: Math.max(0, Math.min(1, yMm / pH)),
-          w: Math.max(0, Math.min(1, wMm / pW)),
-          h: Math.max(0, Math.min(1, hMm / pH)),
+          x: Math.max(0, Math.min(1, xTopMm / pW)),
+          y: Math.max(0, Math.min(1, yTopMm / pH)),
+          w: Math.max(0, Math.min(1, nextWmm / pW)),
+          h: Math.max(0, Math.min(1, nextHmm / pH)),
         };
       }),
     );
