@@ -168,6 +168,28 @@ export async function addCutContour(
     }
   }
 
+  // Mark the document as CMYK print-ready via a DeviceCMYK OutputIntent
+  // (CGATS TR 001 / SWOP) — signals CMYK afdruknorm to prepress workflows.
+  try {
+    const catalog = pdfDoc.catalog;
+    const outputIntent = pdfDoc.context.obj({
+      Type: PDFName.of("OutputIntent"),
+      S: PDFName.of("GTS_PDFX"),
+      OutputConditionIdentifier: "CGATS TR 001",
+      RegistryName: "http://www.color.org",
+      Info: "CGATS TR 001 (SWOP)",
+    });
+    const oiRef = pdfDoc.context.register(outputIntent);
+    const existing = catalog.lookup(PDFName.of("OutputIntents")) as any;
+    if (existing && typeof existing.push === "function") {
+      existing.push(oiRef);
+    } else {
+      catalog.set(PDFName.of("OutputIntents"), pdfDoc.context.obj([oiRef]));
+    }
+  } catch {
+    // non-fatal
+  }
+
   // Silence unused import
   void rgb;
 
