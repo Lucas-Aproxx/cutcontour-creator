@@ -449,9 +449,9 @@ export function CutContourEditor() {
   const selHmm = selSize && selected ? selected.h * (selSize.height / PT_PER_MM) : 0;
   const selXmmRaw = selSize && selected ? selected.x * (selSize.width / PT_PER_MM) : 0;
   const selYmmRaw = selSize && selected ? selected.y * (selSize.height / PT_PER_MM) : 0;
-  const selIsEllipse = selected?.type === "ellipse";
-  const selXmm = selXmmRaw + (selIsEllipse ? selWmm / 2 : 0);
-  const selYmm = selYmmRaw + (selIsEllipse ? selHmm / 2 : 0);
+  // X/Y are always displayed as the exact center of the shape
+  const selXmm = selXmmRaw + selWmm / 2;
+  const selYmm = selYmmRaw + selHmm / 2;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
