@@ -617,17 +617,15 @@ export function CutContourEditor() {
               <div className="flex items-center gap-2">
                 {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
                 <h2 className="font-semibold">Afmetingen (mm)</h2>
-                <span className="ml-auto text-[10px] text-muted-foreground">
-                  {selIsEllipse ? "X/Y = midden" : "X/Y = linksboven"}
-                </span>
+                <span className="ml-auto text-[10px] text-muted-foreground">X/Y = middelpunt</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">X {selIsEllipse ? "(midden)" : ""}</Label>
+                  <Label className="text-xs">X (midden)</Label>
                   <MmInput value={selXmm} onCommit={(n) => updateSelectedMm({ xMm: n })} />
                 </div>
                 <div>
-                  <Label className="text-xs">Y {selIsEllipse ? "(midden)" : ""}</Label>
+                  <Label className="text-xs">Y (midden)</Label>
                   <MmInput value={selYmm} onCommit={(n) => updateSelectedMm({ yMm: n })} />
                 </div>
                 <div>
