@@ -460,6 +460,15 @@ export function CutContourEditor() {
               <Download className="w-4 h-4 mr-2" />
               {exporting ? "Exporteren..." : "Download PDF"}
             </Button>
+            <Button
+              onClick={handleExportAnnotated}
+              disabled={!fileBytes || exporting || shapes.length === 0}
+              variant="secondary"
+              title="Alleen voor eigen gebruik — PDF met X/Y/L/B labels bij elk boorgat"
+            >
+              <Ruler className="w-4 h-4 mr-2" />
+              Meetblad
+            </Button>
           </div>
         </div>
       </header>
