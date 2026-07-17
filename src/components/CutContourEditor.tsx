@@ -194,19 +194,18 @@ export function CutContourEditor() {
         const size = pageSizesPt[s.page] ?? pageSize;
         const pW = size.width / PT_PER_MM;
         const pH = size.height / PT_PER_MM;
-        // Current values in mm; for ellipse, X/Y represent the CENTER
-        const isEllipse = s.type === "ellipse";
+        // X/Y are always measured from the exact center of the shape
         const curWmm = s.w * pW;
         const curHmm = s.h * pH;
-        const curXmm = s.x * pW + (isEllipse ? curWmm / 2 : 0);
-        const curYmm = s.y * pH + (isEllipse ? curHmm / 2 : 0);
+        const curXmm = s.x * pW + curWmm / 2;
+        const curYmm = s.y * pH + curHmm / 2;
         const nextXmm = patch.xMm ?? curXmm;
         const nextYmm = patch.yMm ?? curYmm;
         const nextWmm = patch.wMm ?? curWmm;
         const nextHmm = patch.hMm ?? curHmm;
-        // Convert back to top-left for storage
-        const xTopMm = nextXmm - (isEllipse ? nextWmm / 2 : 0);
-        const yTopMm = nextYmm - (isEllipse ? nextHmm / 2 : 0);
+        // Convert back to top-left for internal storage
+        const xTopMm = nextXmm - nextWmm / 2;
+        const yTopMm = nextYmm - nextHmm / 2;
         return {
           ...s,
           x: Math.max(0, Math.min(1, xTopMm / pW)),
@@ -283,9 +282,9 @@ export function CutContourEditor() {
           }
           ctx.stroke();
 
-          // crosshair at reference point (center for ellipse, top-left for rect)
-          const refX = isEllipse ? x + w / 2 : x;
-          const refY = isEllipse ? y + h / 2 : y;
+          // crosshair at the exact center of every shape
+          const refX = x + w / 2;
+          const refY = y + h / 2;
           ctx.strokeStyle = "#2563eb";
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -296,11 +295,11 @@ export function CutContourEditor() {
           ctx.stroke();
           ctx.lineWidth = 2;
 
-          // values in mm
+          // values in mm — X/Y always refer to the center
           const wmm = s.w * pWmm;
           const hmm = s.h * pHmm;
-          const xmm = s.x * pWmm + (isEllipse ? wmm / 2 : 0);
-          const ymm = s.y * pHmm + (isEllipse ? hmm / 2 : 0);
+          const xmm = s.x * pWmm + wmm / 2;
+          const ymm = s.y * pHmm + hmm / 2;
           const label = [
             `#${idx + 1} ${isEllipse ? "⌀" : "▭"}`,
             `X: ${xmm.toFixed(2)} mm`,
@@ -450,9 +449,9 @@ export function CutContourEditor() {
   const selHmm = selSize && selected ? selected.h * (selSize.height / PT_PER_MM) : 0;
   const selXmmRaw = selSize && selected ? selected.x * (selSize.width / PT_PER_MM) : 0;
   const selYmmRaw = selSize && selected ? selected.y * (selSize.height / PT_PER_MM) : 0;
-  const selIsEllipse = selected?.type === "ellipse";
-  const selXmm = selXmmRaw + (selIsEllipse ? selWmm / 2 : 0);
-  const selYmm = selYmmRaw + (selIsEllipse ? selHmm / 2 : 0);
+  // X/Y are always displayed as the exact center of the shape
+  const selXmm = selXmmRaw + selWmm / 2;
+  const selYmm = selYmmRaw + selHmm / 2;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -618,17 +617,15 @@ export function CutContourEditor() {
               <div className="flex items-center gap-2">
                 {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
                 <h2 className="font-semibold">Afmetingen (mm)</h2>
-                <span className="ml-auto text-[10px] text-muted-foreground">
-                  {selIsEllipse ? "X/Y = midden" : "X/Y = linksboven"}
-                </span>
+                <span className="ml-auto text-[10px] text-muted-foreground">X/Y = middelpunt</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">X {selIsEllipse ? "(midden)" : ""}</Label>
+                  <Label className="text-xs">X (midden)</Label>
                   <MmInput value={selXmm} onCommit={(n) => updateSelectedMm({ xMm: n })} />
                 </div>
                 <div>
-                  <Label className="text-xs">Y {selIsEllipse ? "(midden)" : ""}</Label>
+                  <Label className="text-xs">Y (midden)</Label>
                   <MmInput value={selYmm} onCommit={(n) => updateSelectedMm({ yMm: n })} />
                 </div>
                 <div>
