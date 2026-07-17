@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addCutContour, type CutShape, type ShapeType } from "@/lib/cutcontour";
-import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus } from "lucide-react";
+import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler } from "lucide-react";
+import { PDFDocument } from "pdf-lib";
 
 // pdf.js
 import * as pdfjsLib from "pdfjs-dist/build/pdf.mjs";
