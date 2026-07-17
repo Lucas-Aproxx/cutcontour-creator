@@ -21,6 +21,33 @@ interface PageDims {
 
 const PT_PER_MM = 72 / 25.4;
 
+function MmInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState<string>(Number(value.toFixed(2)).toString());
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setDraft(Number(value.toFixed(2)).toString());
+  }, [value]);
+  return (
+    <Input
+      type="number"
+      step="0.1"
+      value={draft}
+      onFocus={() => { focused.current = true; }}
+      onBlur={() => {
+        focused.current = false;
+        const n = parseFloat(draft);
+        if (Number.isFinite(n)) onCommit(n);
+        setDraft(Number((Number.isFinite(n) ? n : value).toFixed(2)).toString());
+      }}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        const n = parseFloat(e.target.value);
+        if (Number.isFinite(n)) onCommit(n);
+      }}
+    />
+  );
+}
+
 interface PresetShape {
   type: ShapeType;
   xMm: number;
