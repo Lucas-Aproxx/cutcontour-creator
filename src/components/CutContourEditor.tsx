@@ -21,6 +21,33 @@ interface PageDims {
 
 const PT_PER_MM = 72 / 25.4;
 
+function MmInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState<string>(Number(value.toFixed(2)).toString());
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setDraft(Number(value.toFixed(2)).toString());
+  }, [value]);
+  return (
+    <Input
+      type="number"
+      step="0.1"
+      value={draft}
+      onFocus={() => { focused.current = true; }}
+      onBlur={() => {
+        focused.current = false;
+        const n = parseFloat(draft);
+        if (Number.isFinite(n)) onCommit(n);
+        setDraft(Number((Number.isFinite(n) ? n : value).toFixed(2)).toString());
+      }}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        const n = parseFloat(e.target.value);
+        if (Number.isFinite(n)) onCommit(n);
+      }}
+    />
+  );
+}
+
 interface PresetShape {
   type: ShapeType;
   xMm: number;
@@ -598,39 +625,19 @@ export function CutContourEditor() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">X {selIsEllipse ? "(midden)" : ""}</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={Number(selXmm.toFixed(2))}
-                    onChange={(e) => updateSelectedMm({ xMm: parseFloat(e.target.value) || 0 })}
-                  />
+                  <MmInput value={selXmm} onCommit={(n) => updateSelectedMm({ xMm: n })} />
                 </div>
                 <div>
                   <Label className="text-xs">Y {selIsEllipse ? "(midden)" : ""}</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={Number(selYmm.toFixed(2))}
-                    onChange={(e) => updateSelectedMm({ yMm: parseFloat(e.target.value) || 0 })}
-                  />
+                  <MmInput value={selYmm} onCommit={(n) => updateSelectedMm({ yMm: n })} />
                 </div>
                 <div>
                   <Label className="text-xs">L (breedte)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={Number(selWmm.toFixed(2))}
-                    onChange={(e) => updateSelectedMm({ wMm: parseFloat(e.target.value) || 0 })}
-                  />
+                  <MmInput value={selWmm} onCommit={(n) => updateSelectedMm({ wMm: n })} />
                 </div>
                 <div>
                   <Label className="text-xs">B (hoogte)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={Number(selHmm.toFixed(2))}
-                    onChange={(e) => updateSelectedMm({ hMm: parseFloat(e.target.value) || 0 })}
-                  />
+                  <MmInput value={selHmm} onCommit={(n) => updateSelectedMm({ hMm: n })} />
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
