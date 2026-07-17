@@ -282,9 +282,9 @@ export function CutContourEditor() {
           }
           ctx.stroke();
 
-          // crosshair at reference point (center for ellipse, top-left for rect)
-          const refX = isEllipse ? x + w / 2 : x;
-          const refY = isEllipse ? y + h / 2 : y;
+          // crosshair at the exact center of every shape
+          const refX = x + w / 2;
+          const refY = y + h / 2;
           ctx.strokeStyle = "#2563eb";
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -295,11 +295,11 @@ export function CutContourEditor() {
           ctx.stroke();
           ctx.lineWidth = 2;
 
-          // values in mm
+          // values in mm — X/Y always refer to the center
           const wmm = s.w * pWmm;
           const hmm = s.h * pHmm;
-          const xmm = s.x * pWmm + (isEllipse ? wmm / 2 : 0);
-          const ymm = s.y * pHmm + (isEllipse ? hmm / 2 : 0);
+          const xmm = s.x * pWmm + wmm / 2;
+          const ymm = s.y * pHmm + hmm / 2;
           const label = [
             `#${idx + 1} ${isEllipse ? "⌀" : "▭"}`,
             `X: ${xmm.toFixed(2)} mm`,
