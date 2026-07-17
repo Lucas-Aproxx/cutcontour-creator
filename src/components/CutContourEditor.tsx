@@ -194,19 +194,18 @@ export function CutContourEditor() {
         const size = pageSizesPt[s.page] ?? pageSize;
         const pW = size.width / PT_PER_MM;
         const pH = size.height / PT_PER_MM;
-        // Current values in mm; for ellipse, X/Y represent the CENTER
-        const isEllipse = s.type === "ellipse";
+        // X/Y are always measured from the exact center of the shape
         const curWmm = s.w * pW;
         const curHmm = s.h * pH;
-        const curXmm = s.x * pW + (isEllipse ? curWmm / 2 : 0);
-        const curYmm = s.y * pH + (isEllipse ? curHmm / 2 : 0);
+        const curXmm = s.x * pW + curWmm / 2;
+        const curYmm = s.y * pH + curHmm / 2;
         const nextXmm = patch.xMm ?? curXmm;
         const nextYmm = patch.yMm ?? curYmm;
         const nextWmm = patch.wMm ?? curWmm;
         const nextHmm = patch.hMm ?? curHmm;
-        // Convert back to top-left for storage
-        const xTopMm = nextXmm - (isEllipse ? nextWmm / 2 : 0);
-        const yTopMm = nextYmm - (isEllipse ? nextHmm / 2 : 0);
+        // Convert back to top-left for internal storage
+        const xTopMm = nextXmm - nextWmm / 2;
+        const yTopMm = nextYmm - nextHmm / 2;
         return {
           ...s,
           x: Math.max(0, Math.min(1, xTopMm / pW)),
