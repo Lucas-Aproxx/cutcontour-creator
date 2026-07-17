@@ -212,6 +212,145 @@ export function CutContourEditor() {
     }
   };
 
+  const handleExportAnnotated = async () => {
+    if (!pdfDoc || shapes.length === 0) {
+      toast.error("Voeg eerst contouren toe");
+      return;
+    }
+    setExporting(true);
+    try {
+      const outDoc = await PDFDocument.create();
+      const SCALE = 2; // render resolution factor for crisp text
+      for (let i = 0; i < pageCount; i++) {
+        const page = await pdfDoc.getPage(i + 1);
+        const vp = page.getViewport({ scale: SCALE });
+        const canvas = document.createElement("canvas");
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        const ctx = canvas.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise;
+
+        const size = pageSizesPt[i] ?? { width: vp.width / SCALE, height: vp.height / SCALE };
+        const pWmm = size.width / PT_PER_MM;
+        const pHmm = size.height / PT_PER_MM;
+        const pageContours = shapes.filter((s) => s.page === i);
+
+        // Draw contours + labels
+        ctx.lineWidth = 2;
+        ctx.font = `${12 * SCALE}px system-ui, -apple-system, sans-serif`;
+        ctx.textBaseline = "top";
+        pageContours.forEach((s, idx) => {
+          const x = s.x * canvas.width;
+          const y = s.y * canvas.height;
+          const w = s.w * canvas.width;
+          const h = s.h * canvas.height;
+          const isEllipse = s.type === "ellipse";
+
+          // shape outline
+          ctx.strokeStyle = "#e11d48";
+          ctx.beginPath();
+          if (isEllipse) {
+            ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+          } else {
+            ctx.rect(x, y, w, h);
+          }
+          ctx.stroke();
+
+          // crosshair at reference point (center for ellipse, top-left for rect)
+          const refX = isEllipse ? x + w / 2 : x;
+          const refY = isEllipse ? y + h / 2 : y;
+          ctx.strokeStyle = "#2563eb";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(refX - 8 * SCALE, refY);
+          ctx.lineTo(refX + 8 * SCALE, refY);
+          ctx.moveTo(refX, refY - 8 * SCALE);
+          ctx.lineTo(refX, refY + 8 * SCALE);
+          ctx.stroke();
+          ctx.lineWidth = 2;
+
+          // values in mm
+          const wmm = s.w * pWmm;
+          const hmm = s.h * pHmm;
+          const xmm = s.x * pWmm + (isEllipse ? wmm / 2 : 0);
+          const ymm = s.y * pHmm + (isEllipse ? hmm / 2 : 0);
+          const label = [
+            `#${idx + 1} ${isEllipse ? "⌀" : "▭"}`,
+            `X: ${xmm.toFixed(2)} mm`,
+            `Y: ${ymm.toFixed(2)} mm`,
+            `L: ${wmm.toFixed(2)} mm`,
+            `B: ${hmm.toFixed(2)} mm`,
+          ];
+
+          // Label box near top-left of shape
+          const padding = 6 * SCALE;
+          const lineH = 14 * SCALE;
+          const boxW = 140 * SCALE;
+          const boxH = padding * 2 + lineH * label.length;
+          let bx = x + w + 6 * SCALE;
+          let by = y;
+          if (bx + boxW > canvas.width) bx = Math.max(0, x - boxW - 6 * SCALE);
+          if (by + boxH > canvas.height) by = Math.max(0, canvas.height - boxH);
+
+          ctx.fillStyle = "rgba(255,255,255,0.92)";
+          ctx.strokeStyle = "#e11d48";
+          ctx.lineWidth = 1;
+          ctx.fillRect(bx, by, boxW, boxH);
+          ctx.strokeRect(bx, by, boxW, boxH);
+          ctx.lineWidth = 2;
+
+          // leader line to reference point
+          ctx.strokeStyle = "#e11d48";
+          ctx.setLineDash([4 * SCALE, 3 * SCALE]);
+          ctx.beginPath();
+          ctx.moveTo(bx, by + boxH / 2);
+          ctx.lineTo(refX, refY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = "#111827";
+          label.forEach((line, li) => {
+            ctx.fillText(line, bx + padding, by + padding + li * lineH);
+          });
+        });
+
+        // Header banner with page info
+        const headerH = 22 * SCALE;
+        ctx.fillStyle = "rgba(17,24,39,0.85)";
+        ctx.fillRect(0, 0, canvas.width, headerH);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `${12 * SCALE}px system-ui, -apple-system, sans-serif`;
+        ctx.fillText(
+          `Boorgat-meetblad · Pagina ${i + 1}/${pageCount} · ${pWmm.toFixed(1)}×${pHmm.toFixed(1)} mm · ${pageContours.length} boorgat${pageContours.length === 1 ? "" : "en"}`,
+          8 * SCALE,
+          5 * SCALE,
+        );
+
+        const pngBytes = await new Promise<ArrayBuffer>((resolve) => {
+          canvas.toBlob((b) => b!.arrayBuffer().then(resolve), "image/png");
+        });
+        const img = await outDoc.embedPng(pngBytes);
+        const outPage = outDoc.addPage([size.width, size.height]);
+        outPage.drawImage(img, { x: 0, y: 0, width: size.width, height: size.height });
+      }
+
+      const bytes = await outDoc.save();
+      const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = (fileName.replace(/\.pdf$/i, "") || "meetblad") + "_boorgaten.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Boorgat-meetblad geëxporteerd");
+    } catch (err) {
+      console.error(err);
+      toast.error("Export mislukt: " + (err as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const saveCurrentPageAsPreset = () => {
     if (pageShapes.length === 0) {
       toast.error("Geen contouren op deze pagina om op te slaan");
