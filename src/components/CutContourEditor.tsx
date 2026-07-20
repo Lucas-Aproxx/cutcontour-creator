@@ -295,11 +295,11 @@ export function CutContourEditor() {
           ctx.stroke();
           ctx.lineWidth = 2;
 
-          // values in mm — X/Y always refer to the center
+          // values in mm — X = center from left; Y = center from bottom of page
           const wmm = s.w * pWmm;
           const hmm = s.h * pHmm;
           const xmm = s.x * pWmm + wmm / 2;
-          const ymm = s.y * pHmm + hmm / 2;
+          const ymm = pHmm - (s.y * pHmm + hmm / 2);
           const label = [
             `#${idx + 1} ${isEllipse ? "⌀" : "▭"}`,
             `X: ${xmm.toFixed(2)} mm`,
