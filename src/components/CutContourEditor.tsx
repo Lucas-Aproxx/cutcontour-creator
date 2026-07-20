@@ -618,7 +618,7 @@ export function CutContourEditor() {
               <div className="flex items-center gap-2">
                 {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
                 <h2 className="font-semibold">Afmetingen (mm)</h2>
-                <span className="ml-auto text-[10px] text-muted-foreground">X/Y = middelpunt</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">X = midden vanaf links · Y = midden vanaf onderkant</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
