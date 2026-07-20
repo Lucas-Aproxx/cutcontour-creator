@@ -194,18 +194,18 @@ export function CutContourEditor() {
         const size = pageSizesPt[s.page] ?? pageSize;
         const pW = size.width / PT_PER_MM;
         const pH = size.height / PT_PER_MM;
-        // X/Y are always measured from the exact center of the shape
+        // X = center from left; Y = center from BOTTOM of page (print/CAD convention)
         const curWmm = s.w * pW;
         const curHmm = s.h * pH;
         const curXmm = s.x * pW + curWmm / 2;
-        const curYmm = s.y * pH + curHmm / 2;
+        const curYmm = pH - (s.y * pH + curHmm / 2);
         const nextXmm = patch.xMm ?? curXmm;
         const nextYmm = patch.yMm ?? curYmm;
         const nextWmm = patch.wMm ?? curWmm;
         const nextHmm = patch.hMm ?? curHmm;
-        // Convert back to top-left for internal storage
+        // Convert back to top-left normalized for internal storage
         const xTopMm = nextXmm - nextWmm / 2;
-        const yTopMm = nextYmm - nextHmm / 2;
+        const yTopMm = pH - nextYmm - nextHmm / 2;
         return {
           ...s,
           x: Math.max(0, Math.min(1, xTopMm / pW)),
