@@ -449,9 +449,10 @@ export function CutContourEditor() {
   const selHmm = selSize && selected ? selected.h * (selSize.height / PT_PER_MM) : 0;
   const selXmmRaw = selSize && selected ? selected.x * (selSize.width / PT_PER_MM) : 0;
   const selYmmRaw = selSize && selected ? selected.y * (selSize.height / PT_PER_MM) : 0;
-  // X/Y are always displayed as the exact center of the shape
+  const selPHmm = selSize ? selSize.height / PT_PER_MM : 0;
+  // X = center from left; Y = center from BOTTOM of page
   const selXmm = selXmmRaw + selWmm / 2;
-  const selYmm = selYmmRaw + selHmm / 2;
+  const selYmm = selPHmm - (selYmmRaw + selHmm / 2);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
