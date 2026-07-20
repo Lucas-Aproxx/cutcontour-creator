@@ -194,18 +194,18 @@ export function CutContourEditor() {
         const size = pageSizesPt[s.page] ?? pageSize;
         const pW = size.width / PT_PER_MM;
         const pH = size.height / PT_PER_MM;
-        // X/Y are always measured from the exact center of the shape
+        // X = center from left; Y = center from BOTTOM of page (print/CAD convention)
         const curWmm = s.w * pW;
         const curHmm = s.h * pH;
         const curXmm = s.x * pW + curWmm / 2;
-        const curYmm = s.y * pH + curHmm / 2;
+        const curYmm = pH - (s.y * pH + curHmm / 2);
         const nextXmm = patch.xMm ?? curXmm;
         const nextYmm = patch.yMm ?? curYmm;
         const nextWmm = patch.wMm ?? curWmm;
         const nextHmm = patch.hMm ?? curHmm;
-        // Convert back to top-left for internal storage
+        // Convert back to top-left normalized for internal storage
         const xTopMm = nextXmm - nextWmm / 2;
-        const yTopMm = nextYmm - nextHmm / 2;
+        const yTopMm = pH - nextYmm - nextHmm / 2;
         return {
           ...s,
           x: Math.max(0, Math.min(1, xTopMm / pW)),
@@ -295,11 +295,11 @@ export function CutContourEditor() {
           ctx.stroke();
           ctx.lineWidth = 2;
 
-          // values in mm — X/Y always refer to the center
+          // values in mm — X = center from left; Y = center from bottom of page
           const wmm = s.w * pWmm;
           const hmm = s.h * pHmm;
           const xmm = s.x * pWmm + wmm / 2;
-          const ymm = s.y * pHmm + hmm / 2;
+          const ymm = pHmm - (s.y * pHmm + hmm / 2);
           const label = [
             `#${idx + 1} ${isEllipse ? "⌀" : "▭"}`,
             `X: ${xmm.toFixed(2)} mm`,
@@ -449,9 +449,10 @@ export function CutContourEditor() {
   const selHmm = selSize && selected ? selected.h * (selSize.height / PT_PER_MM) : 0;
   const selXmmRaw = selSize && selected ? selected.x * (selSize.width / PT_PER_MM) : 0;
   const selYmmRaw = selSize && selected ? selected.y * (selSize.height / PT_PER_MM) : 0;
-  // X/Y are always displayed as the exact center of the shape
+  const selPHmm = selSize ? selSize.height / PT_PER_MM : 0;
+  // X = center from left; Y = center from BOTTOM of page
   const selXmm = selXmmRaw + selWmm / 2;
-  const selYmm = selYmmRaw + selHmm / 2;
+  const selYmm = selPHmm - (selYmmRaw + selHmm / 2);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -617,7 +618,7 @@ export function CutContourEditor() {
               <div className="flex items-center gap-2">
                 {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
                 <h2 className="font-semibold">Afmetingen (mm)</h2>
-                <span className="ml-auto text-[10px] text-muted-foreground">X/Y = middelpunt</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">X = midden vanaf links · Y = midden vanaf onderkant</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
