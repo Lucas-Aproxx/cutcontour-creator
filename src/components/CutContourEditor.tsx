@@ -814,6 +814,26 @@ export function CutContourEditor() {
             >
               <Ruler className="w-4 h-4 mr-1" /> Maten downloaden (PDF)
             </Button>
+            <div className="flex gap-2 mb-3">
+              <Button size="sm" variant="outline" className="flex-1" onClick={backupPresets} disabled={presets.length === 0}>
+                <Download className="w-4 h-4 mr-1" /> Back-up
+              </Button>
+              <label className="flex-1">
+                <input
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) restorePresets(f);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <span className="inline-flex w-full h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium cursor-pointer hover:bg-accent">
+                  <Upload className="w-4 h-4 mr-1" /> Herstellen
+                </span>
+              </label>
+            </div>
             {presets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Nog geen presets. Teken contouren en klik "Pagina opslaan" om alle contouren op deze pagina als preset te bewaren.
