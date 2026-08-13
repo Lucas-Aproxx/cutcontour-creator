@@ -1,8 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { CutContourEditor } from "@/components/CutContourEditor";
+import { createFileRoute, ClientOnly } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 import { CRM } from "@/components/CRM";
 import { Toaster } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const CutContourEditor = lazy(() =>
+  import("@/components/CutContourEditor").then((m) => ({ default: m.CutContourEditor })),
+);
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -21,7 +25,11 @@ function Index() {
           </div>
         </div>
         <TabsContent value="editor" className="mt-0">
-          <CutContourEditor />
+          <ClientOnly fallback={<div className="p-6 text-sm text-muted-foreground">Editor laden…</div>}>
+            <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Editor laden…</div>}>
+              <CutContourEditor />
+            </Suspense>
+          </ClientOnly>
         </TabsContent>
         <TabsContent value="crm" className="mt-0">
           <div className="max-w-[1600px] mx-auto p-4">
