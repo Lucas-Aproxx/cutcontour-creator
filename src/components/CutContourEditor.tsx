@@ -63,12 +63,31 @@ interface Preset {
 }
 
 const PRESETS_KEY = "cutcontour.presets.v2";
+const LEGACY_KEYS = ["cutcontour.presets.v1", "cutcontour.presets"];
 
 function loadPresets(): Preset[] {
   try {
     const raw = localStorage.getItem(PRESETS_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
+    if (raw) return JSON.parse(raw);
+    // Herstel eventuele oudere opslag
+    for (const k of LEGACY_KEYS) {
+      const old = localStorage.getItem(k);
+      if (!old) continue;
+      const parsed = JSON.parse(old);
+      if (!Array.isArray(parsed)) continue;
+      const migrated: Preset[] = parsed.map((p: any) => ({
+        id: p.id ?? crypto.randomUUID(),
+        name: p.name ?? "Preset",
+        shapes: Array.isArray(p.shapes)
+          ? p.shapes
+          : [{ type: p.type ?? "rect", xMm: p.xMm ?? 0, yMm: p.yMm ?? 0, wMm: p.wMm ?? 0, hMm: p.hMm ?? 0 }],
+      }));
+      if (migrated.length) {
+        localStorage.setItem(PRESETS_KEY, JSON.stringify(migrated));
+        return migrated;
+      }
+    }
+    return [];
   } catch {
     return [];
   }
@@ -435,6 +454,47 @@ export function CutContourEditor() {
     toast.success(`Preset "${p.name}" verwijderd`);
   };
 
+  const backupPresets = () => {
+    if (presets.length === 0) {
+      toast.error("Geen presets om te back-uppen");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(presets, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "cutcontour-presets-backup.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Back-up van presets gedownload");
+  };
+
+  const restorePresets = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!Array.isArray(parsed)) throw new Error("Ongeldig bestand");
+      const imported: Preset[] = parsed.map((p: any) => ({
+        id: crypto.randomUUID(),
+        name: String(p.name ?? "Preset"),
+        shapes: (p.shapes ?? []).map((s: any) => ({
+          type: s.type === "ellipse" ? "ellipse" : "rect",
+          xMm: Number(s.xMm) || 0,
+          yMm: Number(s.yMm) || 0,
+          wMm: Number(s.wMm) || 0,
+          hMm: Number(s.hMm) || 0,
+        })),
+      }));
+      const next = [...presets, ...imported];
+      setPresets(next);
+      savePresets(next);
+      toast.success(`${imported.length} preset(s) hersteld`);
+    } catch (err) {
+      toast.error("Herstellen mislukt: " + (err as Error).message);
+    }
+  };
+
+
+
   const exportPresetsPdf = async () => {
     if (presets.length === 0) {
       toast.error("Geen presets om te exporteren");
@@ -754,6 +814,26 @@ export function CutContourEditor() {
             >
               <Ruler className="w-4 h-4 mr-1" /> Maten downloaden (PDF)
             </Button>
+            <div className="flex gap-2 mb-3">
+              <Button size="sm" variant="outline" className="flex-1" onClick={backupPresets} disabled={presets.length === 0}>
+                <Download className="w-4 h-4 mr-1" /> Back-up
+              </Button>
+              <label className="flex-1">
+                <input
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) restorePresets(f);
+                    e.currentTarget.value = "";
+                  }}
+                />
+                <span className="inline-flex w-full h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium cursor-pointer hover:bg-accent">
+                  <Upload className="w-4 h-4 mr-1" /> Herstellen
+                </span>
+              </label>
+            </div>
             {presets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Nog geen presets. Teken contouren en klik "Pagina opslaan" om alle contouren op deze pagina als preset te bewaren.
