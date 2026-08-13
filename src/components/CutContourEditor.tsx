@@ -435,6 +435,84 @@ export function CutContourEditor() {
     toast.success(`Preset "${p.name}" verwijderd`);
   };
 
+  const exportPresetsPdf = async () => {
+    if (presets.length === 0) {
+      toast.error("Geen presets om te exporteren");
+      return;
+    }
+    setExporting(true);
+    try {
+      const { StandardFonts, rgb } = await import("pdf-lib");
+      const doc = await PDFDocument.create();
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+      const W = 595.28;
+      const H = 841.89;
+      const M = 48;
+      let page = doc.addPage([W, H]);
+      let y = H - M;
+
+      const line = (text: string, size = 10, f = font, gap = 14) => {
+        if (y < M + 40) {
+          page = doc.addPage([W, H]);
+          y = H - M;
+        }
+        page.drawText(text, { x: M, y, size, font: f, color: rgb(0, 0, 0) });
+        y -= gap;
+      };
+
+      const cols = [M, M + 45, M + 130, M + 230, M + 330, M + 425];
+      const row = (vals: string[], f = font, size = 9) => {
+        if (y < M + 40) {
+          page = doc.addPage([W, H]);
+          y = H - M;
+        }
+        vals.forEach((v, i) => {
+          page.drawText(v, { x: cols[i], y, size, font: f, color: rgb(0, 0, 0) });
+        });
+        y -= 13;
+      };
+
+      line("Cutcontour presets — maatoverzicht", 16, bold, 22);
+      line(`Geëxporteerd: ${new Date().toLocaleString("nl-BE")}`, 9, font, 12);
+      line("X en Y = middelpunt van de contour · X vanaf linkerrand · Y vanaf bovenrand · alle maten in mm", 8, font, 20);
+
+      for (const p of presets) {
+        y -= 6;
+        line(`${p.name}  (${p.shapes.length} contour${p.shapes.length === 1 ? "" : "en"})`, 12, bold, 16);
+        row(["#", "Vorm", "X (mm)", "Y (mm)", "L (mm)", "B (mm)"], bold, 9);
+        p.shapes.forEach((s, i) => {
+          const cx = s.xMm + s.wMm / 2;
+          const cy = s.yMm + s.hMm / 2;
+          row([
+            String(i + 1),
+            s.type === "ellipse" ? "Ellips" : "Rechthoek",
+            cx.toFixed(2),
+            cy.toFixed(2),
+            s.wMm.toFixed(2),
+            s.hMm.toFixed(2),
+          ]);
+        });
+        y -= 8;
+      }
+
+      const bytes = await doc.save();
+      const blob = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "cutcontour-presets-maten.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Presetmaten geëxporteerd");
+    } catch (err) {
+      console.error(err);
+      toast.error("Export mislukt: " + (err as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const rectPreview = drawing
     ? {
         left: Math.min(drawing.startX, drawing.curX) * 100 + "%",
