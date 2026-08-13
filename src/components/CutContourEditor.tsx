@@ -63,12 +63,31 @@ interface Preset {
 }
 
 const PRESETS_KEY = "cutcontour.presets.v2";
+const LEGACY_KEYS = ["cutcontour.presets.v1", "cutcontour.presets"];
 
 function loadPresets(): Preset[] {
   try {
     const raw = localStorage.getItem(PRESETS_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
+    if (raw) return JSON.parse(raw);
+    // Herstel eventuele oudere opslag
+    for (const k of LEGACY_KEYS) {
+      const old = localStorage.getItem(k);
+      if (!old) continue;
+      const parsed = JSON.parse(old);
+      if (!Array.isArray(parsed)) continue;
+      const migrated: Preset[] = parsed.map((p: any) => ({
+        id: p.id ?? crypto.randomUUID(),
+        name: p.name ?? "Preset",
+        shapes: Array.isArray(p.shapes)
+          ? p.shapes
+          : [{ type: p.type ?? "rect", xMm: p.xMm ?? 0, yMm: p.yMm ?? 0, wMm: p.wMm ?? 0, hMm: p.hMm ?? 0 }],
+      }));
+      if (migrated.length) {
+        localStorage.setItem(PRESETS_KEY, JSON.stringify(migrated));
+        return migrated;
+      }
+    }
+    return [];
   } catch {
     return [];
   }
