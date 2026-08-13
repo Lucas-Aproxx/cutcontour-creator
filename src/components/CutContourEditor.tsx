@@ -454,6 +454,47 @@ export function CutContourEditor() {
     toast.success(`Preset "${p.name}" verwijderd`);
   };
 
+  const backupPresets = () => {
+    if (presets.length === 0) {
+      toast.error("Geen presets om te back-uppen");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(presets, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "cutcontour-presets-backup.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Back-up van presets gedownload");
+  };
+
+  const restorePresets = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!Array.isArray(parsed)) throw new Error("Ongeldig bestand");
+      const imported: Preset[] = parsed.map((p: any) => ({
+        id: crypto.randomUUID(),
+        name: String(p.name ?? "Preset"),
+        shapes: (p.shapes ?? []).map((s: any) => ({
+          type: s.type === "ellipse" ? "ellipse" : "rect",
+          xMm: Number(s.xMm) || 0,
+          yMm: Number(s.yMm) || 0,
+          wMm: Number(s.wMm) || 0,
+          hMm: Number(s.hMm) || 0,
+        })),
+      }));
+      const next = [...presets, ...imported];
+      setPresets(next);
+      savePresets(next);
+      toast.success(`${imported.length} preset(s) hersteld`);
+    } catch (err) {
+      toast.error("Herstellen mislukt: " + (err as Error).message);
+    }
+  };
+
+
+
   const exportPresetsPdf = async () => {
     if (presets.length === 0) {
       toast.error("Geen presets om te exporteren");
