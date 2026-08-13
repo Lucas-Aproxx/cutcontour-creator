@@ -1,8 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { CutContourEditor } from "@/components/CutContourEditor";
+import { createFileRoute, ClientOnly } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 import { CRM } from "@/components/CRM";
 import { Toaster } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const CutContourEditor = lazy(() =>
+  import("@/components/CutContourEditor").then((m) => ({ default: m.CutContourEditor })),
+);
 
 export const Route = createFileRoute("/")({
   component: Index,
