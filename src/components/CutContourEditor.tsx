@@ -745,6 +745,15 @@ export function CutContourEditor() {
                 <Save className="w-4 h-4 mr-1" /> Pagina opslaan
               </Button>
             </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="w-full mb-3"
+              onClick={exportPresetsPdf}
+              disabled={presets.length === 0 || exporting}
+            >
+              <Ruler className="w-4 h-4 mr-1" /> Maten downloaden (PDF)
+            </Button>
             {presets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Nog geen presets. Teken contouren en klik "Pagina opslaan" om alle contouren op deze pagina als preset te bewaren.
