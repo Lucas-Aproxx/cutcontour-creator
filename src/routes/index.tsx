@@ -25,7 +25,11 @@ function Index() {
           </div>
         </div>
         <TabsContent value="editor" className="mt-0">
-          <CutContourEditor />
+          <ClientOnly fallback={<div className="p-6 text-sm text-muted-foreground">Editor laden…</div>}>
+            <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Editor laden…</div>}>
+              <CutContourEditor />
+            </Suspense>
+          </ClientOnly>
         </TabsContent>
         <TabsContent value="crm" className="mt-0">
           <div className="max-w-[1600px] mx-auto p-4">
