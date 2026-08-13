@@ -81,9 +81,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Upload een PDF, teken zelf snijlijnen en download een drukklare CMYK PDF met een aparte 'Cutcontour'-laag." },
       { name: "author", content: "Cutcontour Editor" },
       { property: "og:title", content: "Cutcontour Editor — Snijlijnen aan PDF toevoegen" },
-      { property: "og:description", content: "Voeg cutcontouren toe aan je ontwerp en exporteer een drukklare CMYK PDF met de laag 'Cutcontour'." },
+      { property: "og:description", content: "Upload een PDF, teken zelf snijlijnen en download een drukklare CMYK PDF met een aparte 'Cutcontour'-laag." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Cutcontour Editor — Snijlijnen aan PDF toevoegen" },
+      { name: "twitter:description", content: "Upload een PDF, teken zelf snijlijnen en download een drukklare CMYK PDF met een aparte 'Cutcontour'-laag." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/bd1ca23c-1c61-4266-a06b-913fc22f32f9/id-preview-f901b2ab--52c13b0f-43c1-4804-96d3-59e774ae7d67.lovable.app-1784538312237.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/bd1ca23c-1c61-4266-a06b-913fc22f32f9/id-preview-f901b2ab--52c13b0f-43c1-4804-96d3-59e774ae7d67.lovable.app-1784538312237.png" },
     ],
     links: [
       {
