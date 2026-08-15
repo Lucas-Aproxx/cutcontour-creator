@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -66,14 +65,6 @@ function AuthPage() {
     }
   };
 
-  const google = async () => {
-    try {
-      await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    } catch (err) {
-      toast.error((err as Error).message);
-    }
-  };
-
   return (
     <main className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md p-6 space-y-5">
@@ -82,15 +73,6 @@ function AuthPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {mode === "signin" ? "Log in om verder te gaan." : "Maak een account aan."}
           </p>
-        </div>
-
-        <Button variant="outline" className="w-full" onClick={google}>
-          Doorgaan met Google
-        </Button>
-
-        <div className="relative text-center text-xs text-muted-foreground">
-          <span className="bg-card px-2 relative z-10">of met e-mail</span>
-          <div className="absolute inset-x-0 top-1/2 border-t" />
         </div>
 
         <form onSubmit={submit} className="space-y-3">
