@@ -126,14 +126,16 @@ export async function createContact(input: {
 }
 
 export async function updateContact(id: string, patch: Partial<Contact>): Promise<void> {
-  const row: Record<string, unknown> = {};
-  if (patch.name !== undefined) row['name'] = patch.name;
-  if (patch.phone !== undefined) row['phone'] = patch.phone;
-  if (patch.email !== undefined) row['email'] = patch.email;
-  if (patch.status !== undefined) row['status'] = patch.status;
-  if (patch.flag !== undefined) row['flag'] = patch.flag;
-  if (patch.note !== undefined) row['note'] = patch.note;
-  if (patch.followUpDate !== undefined) row['follow_up_date'] = patch.followUpDate || null;
+  const row: {
+    name?: string; phone?: string; email?: string; status?: string; flag?: string; note?: string; follow_up_date?: string | null;
+  } = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.phone !== undefined) row.phone = patch.phone;
+  if (patch.email !== undefined) row.email = patch.email;
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.flag !== undefined) row.flag = patch.flag;
+  if (patch.note !== undefined) row.note = patch.note;
+  if (patch.followUpDate !== undefined) row.follow_up_date = patch.followUpDate || null;
   if (Object.keys(row).length === 0) return;
   const { error } = await supabase.from("contacts").update(row).eq("id", id);
   if (error) throw error;
