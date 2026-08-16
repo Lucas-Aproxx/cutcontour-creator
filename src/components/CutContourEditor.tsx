@@ -48,54 +48,13 @@ function MmInput({ value, onCommit }: { value: number; onCommit: (n: number) => 
   );
 }
 
-interface PresetShape {
-  type: ShapeType;
-  xMm: number;
-  yMm: number;
-  wMm: number;
-  hMm: number;
-}
-
-interface Preset {
-  id: string;
-  name: string;
-  shapes: PresetShape[];
-}
-
-const PRESETS_KEY = "cutcontour.presets.v2";
-const LEGACY_KEYS = ["cutcontour.presets.v1", "cutcontour.presets"];
-
-function loadPresets(): Preset[] {
-  try {
-    const raw = localStorage.getItem(PRESETS_KEY);
-    if (raw) return JSON.parse(raw);
-    // Herstel eventuele oudere opslag
-    for (const k of LEGACY_KEYS) {
-      const old = localStorage.getItem(k);
-      if (!old) continue;
-      const parsed = JSON.parse(old);
-      if (!Array.isArray(parsed)) continue;
-      const migrated: Preset[] = parsed.map((p: any) => ({
-        id: p.id ?? crypto.randomUUID(),
-        name: p.name ?? "Preset",
-        shapes: Array.isArray(p.shapes)
-          ? p.shapes
-          : [{ type: p.type ?? "rect", xMm: p.xMm ?? 0, yMm: p.yMm ?? 0, wMm: p.wMm ?? 0, hMm: p.hMm ?? 0 }],
-      }));
-      if (migrated.length) {
-        localStorage.setItem(PRESETS_KEY, JSON.stringify(migrated));
-        return migrated;
-      }
-    }
-    return [];
-  } catch {
-    return [];
-  }
-}
-
-function savePresets(p: Preset[]) {
-  localStorage.setItem(PRESETS_KEY, JSON.stringify(p));
-}
+import {
+  listPresets,
+  createPresets,
+  deletePresetById,
+  type Preset,
+  type PresetShape,
+} from "@/lib/data";
 
 export function CutContourEditor() {
   const [fileBytes, setFileBytes] = useState<ArrayBuffer | null>(null);
@@ -118,7 +77,9 @@ export function CutContourEditor() {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setPresets(loadPresets());
+    listPresets()
+      .then(setPresets)
+      .catch((err) => toast.error("Presets laden mislukt: " + (err as Error).message));
   }, []);
 
   const onFile = useCallback(async (file: File) => {
@@ -396,33 +357,26 @@ export function CutContourEditor() {
     }
   };
 
-  const saveCurrentPageAsPreset = () => {
+  const saveCurrentPageAsPreset = async () => {
     if (pageShapes.length === 0) {
       toast.error("Geen contouren op deze pagina om op te slaan");
       return;
     }
     const name = newPresetName.trim() || `Preset ${presets.length + 1} (${pageShapes.length} contouren)`;
-    const preset: Preset = {
-      id: crypto.randomUUID(),
-      name,
-      shapes: pageShapes.map((s) => {
-        const size = pageSizesPt[s.page] ?? pageSize;
-        const pW = size.width / PT_PER_MM;
-        const pH = size.height / PT_PER_MM;
-        return {
-          type: s.type,
-          xMm: s.x * pW,
-          yMm: s.y * pH,
-          wMm: s.w * pW,
-          hMm: s.h * pH,
-        };
-      }),
-    };
-    const next = [...presets, preset];
-    setPresets(next);
-    savePresets(next);
-    setNewPresetName("");
-    toast.success(`Preset opgeslagen (${preset.shapes.length} contouren)`);
+    const shapes: PresetShape[] = pageShapes.map((s) => {
+      const size = pageSizesPt[s.page] ?? pageSize;
+      const pW = size.width / PT_PER_MM;
+      const pH = size.height / PT_PER_MM;
+      return { type: s.type, xMm: s.x * pW, yMm: s.y * pH, wMm: s.w * pW, hMm: s.h * pH };
+    });
+    try {
+      const created = await createPresets([{ name, shapes }]);
+      setPresets((prev) => [...prev, ...created]);
+      setNewPresetName("");
+      toast.success(`Preset opgeslagen (${shapes.length} contouren)`);
+    } catch (err) {
+      toast.error("Opslaan mislukt: " + (err as Error).message);
+    }
   };
 
   const applyPreset = (preset: Preset) => {
@@ -442,16 +396,19 @@ export function CutContourEditor() {
     toast.success(`Preset "${preset.name}" toegevoegd (${added.length} contouren)`);
   };
 
-  const deletePreset = (id: string) => {
+  const deletePreset = async (id: string) => {
     const p = presets.find((x) => x.id === id);
     if (!p) return;
     if (!window.confirm(`Preset "${p.name}" definitief verwijderen? Dit heeft geen invloed op de contouren die momenteel op de pagina staan.`)) {
       return;
     }
-    const next = presets.filter((x) => x.id !== id);
-    setPresets(next);
-    savePresets(next);
-    toast.success(`Preset "${p.name}" verwijderd`);
+    try {
+      await deletePresetById(id);
+      setPresets((prev) => prev.filter((x) => x.id !== id));
+      toast.success(`Preset "${p.name}" verwijderd`);
+    } catch (err) {
+      toast.error("Verwijderen mislukt: " + (err as Error).message);
+    }
   };
 
   const backupPresets = () => {
@@ -473,8 +430,7 @@ export function CutContourEditor() {
     try {
       const parsed = JSON.parse(await file.text());
       if (!Array.isArray(parsed)) throw new Error("Ongeldig bestand");
-      const imported: Preset[] = parsed.map((p: any) => ({
-        id: crypto.randomUUID(),
+      const items = parsed.map((p: any) => ({
         name: String(p.name ?? "Preset"),
         shapes: (p.shapes ?? []).map((s: any) => ({
           type: s.type === "ellipse" ? "ellipse" : "rect",
@@ -482,18 +438,15 @@ export function CutContourEditor() {
           yMm: Number(s.yMm) || 0,
           wMm: Number(s.wMm) || 0,
           hMm: Number(s.hMm) || 0,
-        })),
+        })) as PresetShape[],
       }));
-      const next = [...presets, ...imported];
-      setPresets(next);
-      savePresets(next);
-      toast.success(`${imported.length} preset(s) hersteld`);
+      const created = await createPresets(items);
+      setPresets((prev) => [...prev, ...created]);
+      toast.success(`${created.length} preset(s) hersteld`);
     } catch (err) {
       toast.error("Herstellen mislukt: " + (err as Error).message);
     }
   };
-
-
 
   const exportPresetsPdf = async () => {
     if (presets.length === 0) {
