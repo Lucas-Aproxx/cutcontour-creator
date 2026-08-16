@@ -146,6 +146,44 @@ export async function deleteContactById(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/* ---------------- Preset exports ---------------- */
+
+function escapeCsv(value: string): string {
+  if (/[;\n"]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+export function exportPresetsToJson(presets: Preset[]): string {
+  const data = presets.map((p) => ({
+    id: p.id,
+    name: p.name,
+    shapes: p.shapes.map((s) => ({
+      type: s.type,
+      xMm: Number((s.xMm + s.wMm / 2).toFixed(2)),
+      yMm: Number((s.yMm + s.hMm / 2).toFixed(2)),
+      lMm: Number(s.wMm.toFixed(2)),
+      bMm: Number(s.hMm.toFixed(2)),
+    })),
+  }));
+  return JSON.stringify(data, null, 2);
+}
+
+export function exportPresetsToCsv(presets: Preset[]): string {
+  const lines = ["Preset;Volgnummer;Vorm;X (mm);Y (mm);L (mm);B (mm)"];
+  presets.forEach((p) => {
+    p.shapes.forEach((s, i) => {
+      const x = (s.xMm + s.wMm / 2).toFixed(2).replace(".", ",");
+      const y = (s.yMm + s.hMm / 2).toFixed(2).replace(".", ",");
+      const l = s.wMm.toFixed(2).replace(".", ",");
+      const b = s.hMm.toFixed(2).replace(".", ",");
+      lines.push(
+        `${escapeCsv(p.name)};${i + 1};${s.type === "ellipse" ? "Ellips" : "Rechthoek"};${x};${y};${l};${b}`,
+      );
+    });
+  });
+  return "\uFEFF" + lines.join("\n");
+}
+
 /* ---------------- One-time migration from browser storage ---------------- */
 
 const PRESET_KEYS = ["cutcontour.presets.v2", "cutcontour.presets.v1", "cutcontour.presets"];
