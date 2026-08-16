@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,21 +32,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Trash2, ArrowUpDown } from "lucide-react";
 
-type ContactStatus = "niet_gecontacteerd" | "gecontacteerd";
-type ContactFlag = "geen" | "blacklist" | "later_contacteren";
-
-interface Contact {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  status: ContactStatus;
-  flag: ContactFlag;
-  followUpDate: string; // yyyy-mm-dd
-  note: string;
-}
-
-const STORAGE_KEY = "crm.contacts.v1";
+import {
+  listContacts,
+  createContact,
+  updateContact,
+  deleteContactById,
+  type Contact,
+  type ContactStatus,
+  type ContactFlag,
+} from "@/lib/data";
 
 const STATUS_LABEL: Record<ContactStatus, string> = {
   niet_gecontacteerd: "Niet gecontacteerd",
@@ -74,7 +68,6 @@ const FLAG_CLASS: Record<ContactFlag, string> = {
     "bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-900/40 dark:text-sky-100",
 };
 
-// Sorting order per status when sorting by "status"
 const STATUS_SORT_ORDER: string[] = [
   "niet_gecontacteerd",
   "later_contacteren",
@@ -83,24 +76,9 @@ const STATUS_SORT_ORDER: string[] = [
 ];
 
 function contactSortKey(c: Contact): string {
-  // Blacklist and later_contacteren override the plain status for grouping.
   if (c.flag === "blacklist") return "blacklist";
   if (c.flag === "later_contacteren") return "later_contacteren";
   return c.status;
-}
-
-function loadContacts(): Contact[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function saveContacts(c: Contact[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(c));
 }
 
 type SortKey = "name" | "status" | "followUpDate";
@@ -118,44 +96,54 @@ export function CRM() {
   const [nEmail, setNEmail] = useState("");
 
   useEffect(() => {
-    setContacts(loadContacts());
+    listContacts()
+      .then(setContacts)
+      .catch((err) => toast.error("Contacten laden mislukt: " + (err as Error).message));
   }, []);
 
-  const update = (next: Contact[]) => {
-    setContacts(next);
-    saveContacts(next);
-  };
-
-  const addContact = () => {
+  const addContact = async () => {
     if (!nName.trim()) {
       toast.error("Naam is verplicht");
       return;
     }
-    const c: Contact = {
-      id: crypto.randomUUID(),
-      name: nName.trim(),
-      phone: nPhone.trim(),
-      email: nEmail.trim(),
-      status: "niet_gecontacteerd",
-      flag: "geen",
-      followUpDate: "",
-      note: "",
-    };
-    update([c, ...contacts]);
-    setNName("");
-    setNPhone("");
-    setNEmail("");
-    toast.success("Contact toegevoegd");
+    try {
+      const c = await createContact({
+        name: nName.trim(),
+        phone: nPhone.trim(),
+        email: nEmail.trim(),
+      });
+      setContacts((prev) => [c, ...prev]);
+      setNName("");
+      setNPhone("");
+      setNEmail("");
+      toast.success("Contact toegevoegd");
+    } catch (err) {
+      toast.error("Opslaan mislukt: " + (err as Error).message);
+    }
   };
+
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const patch = (id: string, p: Partial<Contact>) => {
-    update(contacts.map((c) => (c.id === id ? { ...c, ...p } : c)));
+    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...p } : c)));
+    const existing = timers.current[id];
+    if (existing) clearTimeout(existing);
+    timers.current[id] = setTimeout(() => {
+      updateContact(id, p).catch((err) =>
+        toast.error("Opslaan mislukt: " + (err as Error).message),
+      );
+    }, 500);
   };
 
-  const remove = (id: string) => {
-    update(contacts.filter((c) => c.id !== id));
-    setDeleteId(null);
-    toast.success("Contact verwijderd");
+  const remove = async (id: string) => {
+    try {
+      await deleteContactById(id);
+      setContacts((prev) => prev.filter((c) => c.id !== id));
+      setDeleteId(null);
+      toast.success("Contact verwijderd");
+    } catch (err) {
+      toast.error("Verwijderen mislukt: " + (err as Error).message);
+    }
   };
 
   const sorted = useMemo(() => {
