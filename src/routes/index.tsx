@@ -1,43 +1,53 @@
-import { createFileRoute, ClientOnly } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
-import { CRM } from "@/components/CRM";
-import { Toaster } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const CutContourEditor = lazy(() =>
-  import("@/components/CutContourEditor").then((m) => ({ default: m.CutContourEditor })),
-);
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
-  component: Index,
+  component: Landing,
+  head: () => ({
+    meta: [
+      { title: "Cutcontour Studio · Snijcontouren op maat" },
+      {
+        name: "description",
+        content:
+          "Plaats snijcontouren op millimeter-precisie op je PDF, exporteer volgens CMYK-afdruknorm en beheer presets en contacten in de cloud.",
+      },
+      { property: "og:title", content: "Cutcontour Studio · Snijcontouren op maat" },
+      {
+        property: "og:description",
+        content:
+          "Snijcontouren op millimeter-precisie, CMYK-export, presets en CRM — veilig in de cloud.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
 });
 
-function Index() {
+function Landing() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate({ to: "/app", replace: true });
+    });
+  }, [navigate]);
+
   return (
-    <>
-      <Tabs defaultValue="editor" className="w-full">
-        <div className="border-b bg-background sticky top-0 z-10">
-          <div className="max-w-[1600px] mx-auto px-4 py-2">
-            <TabsList>
-              <TabsTrigger value="editor">Cutcontour Editor</TabsTrigger>
-              <TabsTrigger value="crm">CRM</TabsTrigger>
-            </TabsList>
-          </div>
+    <main className="min-h-screen flex items-center justify-center bg-muted/30 p-6">
+      <div className="max-w-xl text-center space-y-5">
+        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">Cutcontour Studio</h1>
+        <p className="text-muted-foreground">
+          Plaats snijcontouren op millimeter-precisie, exporteer volgens CMYK-afdruknorm en beheer je
+          presets en contacten. Alles wordt bewaard in de cloud, op elk toestel beschikbaar.
+        </p>
+        <div className="flex justify-center gap-3">
+          <Button asChild size="lg">
+            <Link to="/auth">Inloggen of registreren</Link>
+          </Button>
         </div>
-        <TabsContent value="editor" className="mt-0">
-          <ClientOnly fallback={<div className="p-6 text-sm text-muted-foreground">Editor laden…</div>}>
-            <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Editor laden…</div>}>
-              <CutContourEditor />
-            </Suspense>
-          </ClientOnly>
-        </TabsContent>
-        <TabsContent value="crm" className="mt-0">
-          <div className="max-w-[1600px] mx-auto p-4">
-            <CRM />
-          </div>
-        </TabsContent>
-      </Tabs>
-      <Toaster position="bottom-right" />
-    </>
+      </div>
+    </main>
   );
 }
