@@ -29,7 +29,16 @@ export interface Contact {
   followUpDate: string;
   note: string;
   custom: Record<string, string>;
+  folderId: string;
 }
+
+export interface CrmFolder {
+  id: string;
+  name: string;
+  color: string;
+  position: number;
+}
+
 
 export type CrmFieldType = "dropdown" | "text" | "longtext";
 
