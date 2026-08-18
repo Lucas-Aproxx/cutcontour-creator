@@ -193,6 +193,17 @@ export function CRM() {
   const [insertIndex, setInsertIndex] = useState(-1);
   const [columns, setColumns] = useState<string[]>([]);
 
+  // Mappen
+  const [folders, setFolders] = useState<CrmFolder[]>([]);
+  const [activeFolder, setActiveFolder] = useState<string>("all"); // all | none | <id>
+  const [folderOpen, setFolderOpen] = useState(false);
+  const [folderName, setFolderName] = useState("");
+  const [folderColor, setFolderColor] = useState("sky");
+  const [manageFoldersOpen, setManageFoldersOpen] = useState(false);
+  const [deleteFolderId, setDeleteFolderId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
   useEffect(() => {
     listContacts()
       .then(setContacts)
@@ -203,6 +214,9 @@ export function CRM() {
     getCrmLayout()
       .then(setColumns)
       .catch(() => {});
+    listCrmFolders()
+      .then(setFolders)
+      .catch((err) => toast.error("Mappen laden mislukt: " + (err as Error).message));
   }, []);
 
   const addContact = async () => {
@@ -215,6 +229,7 @@ export function CRM() {
         name: nName.trim(),
         phone: nPhone.trim(),
         email: nEmail.trim(),
+        folderId: activeFolder !== "all" && activeFolder !== "none" ? activeFolder : "",
       });
       setContacts((prev) => [c, ...prev]);
       setNName("");
@@ -225,6 +240,90 @@ export function CRM() {
       toast.error("Opslaan mislukt: " + (err as Error).message);
     }
   };
+
+  /* ---------- Mappen ---------- */
+
+  const saveNewFolder = async () => {
+    const name = folderName.trim();
+    if (!name) {
+      toast.error("Geef de map een naam");
+      return;
+    }
+    try {
+      const created = await createCrmFolder({
+        name,
+        color: folderColor,
+        position: folders.length,
+      });
+      setFolders((prev) => [...prev, created]);
+      setFolderOpen(false);
+      setFolderName("");
+      setFolderColor("sky");
+      toast.success("Map toegevoegd");
+    } catch (err) {
+      toast.error("Map opslaan mislukt: " + (err as Error).message);
+    }
+  };
+
+  const folderTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const patchFolder = (id: string, p: Partial<Pick<CrmFolder, "name" | "color" | "position">>) => {
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, ...p } : f)));
+    const existing = folderTimers.current[id];
+    if (existing) clearTimeout(existing);
+    folderTimers.current[id] = setTimeout(() => {
+      updateCrmFolder(id, p).catch((err) =>
+        toast.error("Map opslaan mislukt: " + (err as Error).message),
+      );
+    }, 500);
+  };
+
+  const moveFolder = (id: string, dir: -1 | 1) => {
+    const idx = folders.findIndex((f) => f.id === id);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= folders.length) return;
+    const next = [...folders];
+    const [item] = next.splice(idx, 1);
+    next.splice(target, 0, item);
+    setFolders(next);
+    next.forEach((f, i) => {
+      if (f.position !== i) void updateCrmFolder(f.id, { position: i });
+    });
+  };
+
+  const removeFolder = async (id: string) => {
+    try {
+      await deleteCrmFolder(id);
+      setFolders((prev) => prev.filter((f) => f.id !== id));
+      setContacts((prev) => prev.map((c) => (c.folderId === id ? { ...c, folderId: "" } : c)));
+      if (activeFolder === id) setActiveFolder("all");
+      setDeleteFolderId(null);
+      toast.success("Map verwijderd (contacten blijven bestaan)");
+    } catch (err) {
+      toast.error("Verwijderen mislukt: " + (err as Error).message);
+    }
+  };
+
+  const dropOnFolder = (target: string) => {
+    setDragOver(null);
+    const id = draggingId;
+    setDraggingId(null);
+    if (!id) return;
+    const folderId = target === "none" ? "" : target;
+    const c = contacts.find((x) => x.id === id);
+    if (!c || c.folderId === folderId) return;
+    setContacts((prev) => prev.map((x) => (x.id === id ? { ...x, folderId } : x)));
+    updateContact(id, { folderId })
+      .then(() =>
+        toast.success(
+          folderId
+            ? `Verplaatst naar “${folders.find((f) => f.id === folderId)?.name ?? "map"}”`
+            : "Uit map gehaald",
+        ),
+      )
+      .catch((err) => toast.error("Verplaatsen mislukt: " + (err as Error).message));
+  };
+
 
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
