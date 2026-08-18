@@ -20,6 +20,7 @@ export type Database = {
           custom: Json
           email: string
           flag: string
+          folder_id: string | null
           follow_up_date: string | null
           id: string
           name: string
@@ -34,6 +35,7 @@ export type Database = {
           custom?: Json
           email?: string
           flag?: string
+          folder_id?: string | null
           follow_up_date?: string | null
           id?: string
           name?: string
@@ -48,6 +50,7 @@ export type Database = {
           custom?: Json
           email?: string
           flag?: string
+          folder_id?: string | null
           follow_up_date?: string | null
           id?: string
           name?: string
@@ -57,7 +60,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contacts_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "crm_folders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       crm_fields: {
         Row: {
@@ -87,6 +98,36 @@ export type Database = {
           options?: Json
           position?: number
           type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      crm_folders: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          position: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
           updated_at?: string
           user_id?: string
         }
