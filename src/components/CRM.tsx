@@ -576,13 +576,12 @@ export function CRM() {
     }
     if (f.type === "longtext") {
       return (
-        <Textarea
+        <AutoTextarea
           value={val}
-          onChange={(e) => patchCustom(c, f.id, e.target.value)}
-          rows={2}
+          onChange={(v) => patchCustom(c, f.id, v)}
           maxLength={5000}
-          className="min-h-[40px]"
         />
+
       );
     }
     return (
