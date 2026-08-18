@@ -832,116 +832,149 @@ export function CRM() {
         </DialogContent>
       </Dialog>
 
-      {/* Velden beheren */}
+      {/* Kolommen beheren */}
       <Dialog open={manageOpen} onOpenChange={setManageOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Velden beheren</DialogTitle>
+            <DialogTitle>Kolommen beheren</DialogTitle>
             <DialogDescription>
-              Wijzig namen, kleuren, opties en de volgorde van je eigen velden.
+              Zet elke kolom — ook de standaardkolommen — met de pijltjes op de plaats
+              die je wil. Eigen velden kan je hier ook hernoemen en aanpassen.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            {fields.map((f, idx) => (
-              <div key={f.id} className="rounded-lg border p-3 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={f.name}
-                    onChange={(e) => patchField(f.id, { name: e.target.value })}
-                    maxLength={60}
-                  />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {FIELD_TYPE_LABEL[f.type]}
-                  </span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Omhoog"
-                    disabled={idx === 0}
-                    onClick={() => moveField(f.id, -1)}
-                  >
-                    <ArrowUp className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Omlaag"
-                    disabled={idx === fields.length - 1}
-                    onClick={() => moveField(f.id, 1)}
-                  >
-                    <ArrowDown className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Veld verwijderen"
-                    onClick={() => setDeleteFieldId(f.id)}
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-
-                {f.type === "dropdown" && (
-                  <div className="space-y-2">
-                    {f.options.map((o, oi) => (
-                      <div key={o.id} className="flex items-center gap-2">
-                        <Input
-                          value={o.label}
-                          onChange={(e) =>
-                            patchField(f.id, {
-                              options: f.options.map((p, pi) =>
-                                pi === oi ? { ...p, label: e.target.value } : p,
-                              ),
-                            })
-                          }
-                          maxLength={60}
-                        />
-                        <Select
-                          value={o.color}
-                          onValueChange={(v) =>
-                            patchField(f.id, {
-                              options: f.options.map((p, pi) =>
-                                pi === oi ? { ...p, color: v } : p,
-                              ),
-                            })
-                          }
-                        >
-                          <SelectTrigger className={`w-[130px] border ${colorClass(o.color)}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {COLORS.map((c) => (
-                              <SelectItem key={c.key} value={c.key}>
-                                <span className="flex items-center gap-2">
-                                  <span className={`w-3 h-3 rounded-full ${c.dot}`} />
-                                  {c.label}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label="Optie verwijderen"
-                          onClick={() =>
-                            patchField(f.id, {
-                              options: f.options.filter((_, pi) => pi !== oi),
-                            })
-                          }
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button size="sm" variant="outline" onClick={() => addOptionTo(f)}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Optie toevoegen
+          <div className="space-y-3">
+            {orderedCols.map((key, idx) => {
+              const builtin = BUILTIN_COLS.find((x) => x.key === key);
+              const f = builtin ? null : fields.find((x) => `f:${x.id}` === key) ?? null;
+              if (!builtin && !f) return null;
+              return (
+                <div key={key} className="rounded-lg border p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-6 text-right">
+                      {idx + 1}
+                    </span>
+                    {builtin ? (
+                      <span className="flex-1 text-sm font-medium">{builtin.label}</span>
+                    ) : (
+                      <Input
+                        value={f!.name}
+                        onChange={(e) => patchField(f!.id, { name: e.target.value })}
+                        maxLength={60}
+                      />
+                    )}
+                    {builtin ? (
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        Standaard
+                      </span>
+                    ) : (
+                      <Select
+                        value={f!.type}
+                        onValueChange={(v) => patchField(f!.id, { type: v as CrmFieldType })}
+                      >
+                        <SelectTrigger className="w-[150px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(FIELD_TYPE_LABEL) as CrmFieldType[]).map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {FIELD_TYPE_LABEL[t]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Naar links"
+                      disabled={idx === 0}
+                      onClick={() => moveColumn(key, -1)}
+                    >
+                      <ArrowUp className="w-4 h-4" />
                     </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Naar rechts"
+                      disabled={idx === orderedCols.length - 1}
+                      onClick={() => moveColumn(key, 1)}
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                    </Button>
+                    {f && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Veld verwijderen"
+                        onClick={() => setDeleteFieldId(f.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {f && f.type === "dropdown" && (
+                    <div className="space-y-2">
+                      {f.options.map((o, oi) => (
+                        <div key={o.id} className="flex items-center gap-2">
+                          <Input
+                            value={o.label}
+                            onChange={(e) =>
+                              patchField(f.id, {
+                                options: f.options.map((p, pi) =>
+                                  pi === oi ? { ...p, label: e.target.value } : p,
+                                ),
+                              })
+                            }
+                            maxLength={60}
+                          />
+                          <Select
+                            value={o.color}
+                            onValueChange={(v) =>
+                              patchField(f.id, {
+                                options: f.options.map((p, pi) =>
+                                  pi === oi ? { ...p, color: v } : p,
+                                ),
+                              })
+                            }
+                          >
+                            <SelectTrigger className={`w-[130px] border ${colorClass(o.color)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {COLORS.map((c) => (
+                                <SelectItem key={c.key} value={c.key}>
+                                  <span className="flex items-center gap-2">
+                                    <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+                                    {c.label}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Optie verwijderen"
+                            onClick={() =>
+                              patchField(f.id, {
+                                options: f.options.filter((_, pi) => pi !== oi),
+                              })
+                            }
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button size="sm" variant="outline" onClick={() => addOptionTo(f)}>
+                        <Plus className="w-4 h-4 mr-1" />
+                        Optie toevoegen
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <DialogFooter>
             <Button onClick={() => setManageOpen(false)}>Sluiten</Button>
