@@ -612,8 +612,15 @@ export function CRM() {
 
   /* ---------- Sorting ---------- */
 
+  const visible = useMemo(() => {
+    if (activeFolder === "all") return contacts;
+    if (activeFolder === "none") return contacts.filter((c) => !c.folderId);
+    return contacts.filter((c) => c.folderId === activeFolder);
+  }, [contacts, activeFolder]);
+
   const sorted = useMemo(() => {
-    const arr = [...contacts];
+    const arr = [...visible];
+
     arr.sort((a, b) => {
       let cmp = 0;
       if (sortKey === "name") {
