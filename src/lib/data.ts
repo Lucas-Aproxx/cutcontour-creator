@@ -128,38 +128,10 @@ export async function deletePresetById(id: string): Promise<void> {
 
 /* ---------------- Contacts ---------------- */
 
-export async function listContacts(): Promise<Contact[]> {
-  const { data, error } = await supabase
-    .from("contacts")
-    .select("id, name, phone, email, status, flag, follow_up_date, note, custom")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((r: any) => ({
-    id: r.id,
-    name: r.name ?? "",
-    phone: r.phone ?? "",
-    email: r.email ?? "",
-    status: (r.status as ContactStatus) ?? "niet_gecontacteerd",
-    flag: (r.flag as ContactFlag) ?? "geen",
-    followUpDate: r.follow_up_date ?? "",
-    note: r.note ?? "",
-    custom: normCustom(r.custom),
-  }));
-}
+const CONTACT_COLS =
+  "id, name, phone, email, status, flag, follow_up_date, note, custom, folder_id";
 
-export async function createContact(input: {
-  name: string;
-  phone: string;
-  email: string;
-}): Promise<Contact> {
-  const userId = await requireUserId();
-  const { data, error } = await supabase
-    .from("contacts")
-    .insert({ user_id: userId, ...input })
-    .select("id, name, phone, email, status, flag, follow_up_date, note, custom")
-    .single();
-  if (error) throw error;
-  const r = data as any;
+function mapContact(r: any): Contact {
   return {
     id: r.id,
     name: r.name ?? "",
@@ -170,7 +142,34 @@ export async function createContact(input: {
     followUpDate: r.follow_up_date ?? "",
     note: r.note ?? "",
     custom: normCustom(r.custom),
+    folderId: r.folder_id ?? "",
   };
+}
+
+export async function listContacts(): Promise<Contact[]> {
+  const { data, error } = await (supabase as any)
+    .from("contacts")
+    .select(CONTACT_COLS)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapContact);
+}
+
+export async function createContact(input: {
+  name: string;
+  phone: string;
+  email: string;
+  folderId?: string;
+}): Promise<Contact> {
+  const userId = await requireUserId();
+  const { folderId, ...rest } = input;
+  const { data, error } = await (supabase as any)
+    .from("contacts")
+    .insert({ user_id: userId, ...rest, folder_id: folderId || null })
+    .select(CONTACT_COLS)
+    .single();
+  if (error) throw error;
+  return mapContact(data);
 }
 
 export async function updateContact(id: string, patch: Partial<Contact>): Promise<void> {
@@ -183,10 +182,63 @@ export async function updateContact(id: string, patch: Partial<Contact>): Promis
   if (patch.note !== undefined) row.note = patch.note;
   if (patch.custom !== undefined) row.custom = patch.custom;
   if (patch.followUpDate !== undefined) row.follow_up_date = patch.followUpDate || null;
+  if (patch.folderId !== undefined) row.folder_id = patch.folderId || null;
   if (Object.keys(row).length === 0) return;
   const { error } = await supabase.from("contacts").update(row as any).eq("id", id);
   if (error) throw error;
 }
+
+/* ---------------- CRM mappen ---------------- */
+
+export async function listCrmFolders(): Promise<CrmFolder[]> {
+  const { data, error } = await (supabase as any)
+    .from("crm_folders")
+    .select("id, name, color, position")
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    name: r.name ?? "",
+    color: String(r.color ?? "sky"),
+    position: Number(r.position) || 0,
+  }));
+}
+
+export async function createCrmFolder(input: {
+  name: string;
+  color: string;
+  position: number;
+}): Promise<CrmFolder> {
+  const userId = await requireUserId();
+  const { data, error } = await (supabase as any)
+    .from("crm_folders")
+    .insert({ user_id: userId, ...input })
+    .select("id, name, color, position")
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    name: data.name ?? "",
+    color: String(data.color ?? "sky"),
+    position: Number(data.position) || 0,
+  };
+}
+
+export async function updateCrmFolder(
+  id: string,
+  patch: Partial<Pick<CrmFolder, "name" | "color" | "position">>,
+): Promise<void> {
+  if (Object.keys(patch).length === 0) return;
+  const { error } = await (supabase as any).from("crm_folders").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCrmFolder(id: string): Promise<void> {
+  const { error } = await (supabase as any).from("crm_folders").delete().eq("id", id);
+  if (error) throw error;
+}
+
 
 /* ---------------- Custom CRM fields ---------------- */
 
