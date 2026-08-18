@@ -28,7 +28,43 @@ export interface Contact {
   flag: ContactFlag;
   followUpDate: string;
   note: string;
+  custom: Record<string, string>;
 }
+
+export type CrmFieldType = "dropdown" | "text" | "longtext";
+
+export interface CrmFieldOption {
+  id: string;
+  label: string;
+  color: string;
+}
+
+export interface CrmField {
+  id: string;
+  name: string;
+  type: CrmFieldType;
+  options: CrmFieldOption[];
+  position: number;
+}
+
+function normOptions(raw: unknown): CrmFieldOption[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((o: any, i: number) => ({
+    id: String(o?.id ?? `opt-${i}`),
+    label: String(o?.label ?? ""),
+    color: String(o?.color ?? "slate"),
+  }));
+}
+
+function normCustom(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    out[k] = v == null ? "" : String(v);
+  }
+  return out;
+}
+
 
 function normShapes(raw: unknown): PresetShape[] {
   if (!Array.isArray(raw)) return [];
