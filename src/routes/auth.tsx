@@ -30,7 +30,6 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,19 +44,9 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/auth` },
-        });
-        if (error) throw error;
-        toast.success("Account aangemaakt. Controleer je e-mail om te bevestigen.");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/app", replace: true });
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate({ to: "/app", replace: true });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -70,9 +59,7 @@ function AuthPage() {
       <Card className="w-full max-w-md p-6 space-y-5">
         <div>
           <h1 className="text-2xl font-semibold">Cutcontour Studio</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {mode === "signin" ? "Log in om verder te gaan." : "Maak een account aan."}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Log in om verder te gaan.</p>
         </div>
 
         <form onSubmit={submit} className="space-y-3">
@@ -92,25 +79,20 @@ function AuthPage() {
             <Input
               id="password"
               type="password"
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              autoComplete="current-password"
               required
-              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
           <Button type="submit" className="w-full" disabled={busy}>
-            {mode === "signin" ? "Inloggen" : "Registreren"}
+            Inloggen
           </Button>
         </form>
 
-        <button
-          type="button"
-          className="text-sm text-muted-foreground underline w-full"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-        >
-          {mode === "signin" ? "Nog geen account? Registreer" : "Al een account? Inloggen"}
-        </button>
+        <p className="text-xs text-muted-foreground text-center">
+          Registratie is uitgeschakeld. Er is één vast account voor deze applicatie.
+        </p>
       </Card>
       <Toaster position="bottom-right" />
     </main>
