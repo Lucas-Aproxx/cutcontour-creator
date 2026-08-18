@@ -57,6 +57,8 @@ import {
   createCrmField,
   updateCrmField,
   deleteCrmField,
+  getCrmLayout,
+  saveCrmLayout,
   type Contact,
   type ContactStatus,
   type ContactFlag,
@@ -272,7 +274,12 @@ export function CRM() {
         options,
         position: fields.length,
       });
+      const key = `f:${created.id}`;
+      const base = orderedCols.filter((k) => k !== key);
+      const at = insertIndex < 0 || insertIndex > base.length ? base.length : insertIndex;
+      const nextCols = [...base.slice(0, at), key, ...base.slice(at)];
       setFields((prev) => [...prev, created]);
+      void persistColumns(nextCols);
       setAddOpen(false);
       resetFieldForm();
       toast.success("Veld toegevoegd");
@@ -297,22 +304,37 @@ export function CRM() {
     }, 500);
   };
 
-  const moveField = async (id: string, dir: -1 | 1) => {
-    const idx = fields.findIndex((f) => f.id === id);
-    const target = idx + dir;
-    if (idx < 0 || target < 0 || target >= fields.length) return;
-    const next = [...fields];
-    const [item] = next.splice(idx, 1);
-    next.splice(target, 0, item);
-    const withPos = next.map((f, i) => ({ ...f, position: i }));
-    setFields(withPos);
+  const orderedCols = useMemo(() => {
+    const all = [...BUILTIN_COLS.map((b) => b.key), ...fields.map((f) => `f:${f.id}`)];
+    const kept = columns.filter((k) => all.includes(k));
+    const missing = all.filter((k) => !kept.includes(k));
+    return [...kept, ...missing];
+  }, [columns, fields]);
+
+  const persistColumns = async (next: string[]) => {
+    setColumns(next);
     try {
-      await Promise.all(
-        withPos.map((f) => updateCrmField(f.id, { position: f.position })),
-      );
+      await saveCrmLayout(next);
     } catch (err) {
       toast.error("Volgorde opslaan mislukt: " + (err as Error).message);
     }
+  };
+
+  const moveColumn = (key: string, dir: -1 | 1) => {
+    const idx = orderedCols.indexOf(key);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= orderedCols.length) return;
+    const next = [...orderedCols];
+    const [item] = next.splice(idx, 1);
+    next.splice(target, 0, item);
+    void persistColumns(next);
+  };
+
+  const colLabel = (key: string): string => {
+    const b = BUILTIN_COLS.find((x) => x.key === key);
+    if (b) return b.label;
+    const f = fields.find((x) => `f:${x.id}` === key);
+    return f?.name || "Veld";
   };
 
   const removeField = async (id: string) => {
