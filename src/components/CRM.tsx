@@ -625,7 +625,15 @@ export function CRM() {
       let cmp = 0;
       if (sortKey === "name") {
         cmp = a.name.localeCompare(b.name, "nl", { sensitivity: "base" });
+      } else if (sortKey === "folder") {
+        const idx = (c: Contact) => {
+          const i = folders.findIndex((f) => f.id === c.folderId);
+          return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+        };
+        cmp = idx(a) - idx(b);
+        if (cmp === 0) cmp = a.name.localeCompare(b.name, "nl");
       } else if (sortKey === "followUpDate") {
+
         const av = a.followUpDate || "";
         const bv = b.followUpDate || "";
         if (!av && !bv) cmp = 0;
