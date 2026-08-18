@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,6 +46,11 @@ import {
   ArrowUp,
   ArrowDown,
   X,
+  Folder,
+  FolderPlus,
+  GripVertical,
+  Inbox,
+  Users,
 } from "lucide-react";
 
 import {
@@ -59,13 +64,19 @@ import {
   deleteCrmField,
   getCrmLayout,
   saveCrmLayout,
+  listCrmFolders,
+  createCrmFolder,
+  updateCrmFolder,
+  deleteCrmFolder,
   type Contact,
   type ContactStatus,
   type ContactFlag,
   type CrmField,
   type CrmFieldType,
   type CrmFieldOption,
+  type CrmFolder,
 } from "@/lib/data";
+
 
 const STATUS_LABEL: Record<ContactStatus, string> = {
   niet_gecontacteerd: "Niet gecontacteerd",
@@ -129,7 +140,7 @@ function contactSortKey(c: Contact): string {
   return c.status;
 }
 
-type SortKey = "name" | "status" | "followUpDate" | `custom:${string}`;
+type SortKey = "name" | "status" | "followUpDate" | "folder" | `custom:${string}`;
 type SortDir = "asc" | "desc";
 
 interface DraftOption {
@@ -182,6 +193,17 @@ export function CRM() {
   const [insertIndex, setInsertIndex] = useState(-1);
   const [columns, setColumns] = useState<string[]>([]);
 
+  // Mappen
+  const [folders, setFolders] = useState<CrmFolder[]>([]);
+  const [activeFolder, setActiveFolder] = useState<string>("all"); // all | none | <id>
+  const [folderOpen, setFolderOpen] = useState(false);
+  const [folderName, setFolderName] = useState("");
+  const [folderColor, setFolderColor] = useState("sky");
+  const [manageFoldersOpen, setManageFoldersOpen] = useState(false);
+  const [deleteFolderId, setDeleteFolderId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
   useEffect(() => {
     listContacts()
       .then(setContacts)
@@ -192,6 +214,9 @@ export function CRM() {
     getCrmLayout()
       .then(setColumns)
       .catch(() => {});
+    listCrmFolders()
+      .then(setFolders)
+      .catch((err) => toast.error("Mappen laden mislukt: " + (err as Error).message));
   }, []);
 
   const addContact = async () => {
@@ -204,6 +229,7 @@ export function CRM() {
         name: nName.trim(),
         phone: nPhone.trim(),
         email: nEmail.trim(),
+        folderId: activeFolder !== "all" && activeFolder !== "none" ? activeFolder : "",
       });
       setContacts((prev) => [c, ...prev]);
       setNName("");
@@ -214,6 +240,90 @@ export function CRM() {
       toast.error("Opslaan mislukt: " + (err as Error).message);
     }
   };
+
+  /* ---------- Mappen ---------- */
+
+  const saveNewFolder = async () => {
+    const name = folderName.trim();
+    if (!name) {
+      toast.error("Geef de map een naam");
+      return;
+    }
+    try {
+      const created = await createCrmFolder({
+        name,
+        color: folderColor,
+        position: folders.length,
+      });
+      setFolders((prev) => [...prev, created]);
+      setFolderOpen(false);
+      setFolderName("");
+      setFolderColor("sky");
+      toast.success("Map toegevoegd");
+    } catch (err) {
+      toast.error("Map opslaan mislukt: " + (err as Error).message);
+    }
+  };
+
+  const folderTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const patchFolder = (id: string, p: Partial<Pick<CrmFolder, "name" | "color" | "position">>) => {
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, ...p } : f)));
+    const existing = folderTimers.current[id];
+    if (existing) clearTimeout(existing);
+    folderTimers.current[id] = setTimeout(() => {
+      updateCrmFolder(id, p).catch((err) =>
+        toast.error("Map opslaan mislukt: " + (err as Error).message),
+      );
+    }, 500);
+  };
+
+  const moveFolder = (id: string, dir: -1 | 1) => {
+    const idx = folders.findIndex((f) => f.id === id);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= folders.length) return;
+    const next = [...folders];
+    const [item] = next.splice(idx, 1);
+    next.splice(target, 0, item);
+    setFolders(next);
+    next.forEach((f, i) => {
+      if (f.position !== i) void updateCrmFolder(f.id, { position: i });
+    });
+  };
+
+  const removeFolder = async (id: string) => {
+    try {
+      await deleteCrmFolder(id);
+      setFolders((prev) => prev.filter((f) => f.id !== id));
+      setContacts((prev) => prev.map((c) => (c.folderId === id ? { ...c, folderId: "" } : c)));
+      if (activeFolder === id) setActiveFolder("all");
+      setDeleteFolderId(null);
+      toast.success("Map verwijderd (contacten blijven bestaan)");
+    } catch (err) {
+      toast.error("Verwijderen mislukt: " + (err as Error).message);
+    }
+  };
+
+  const dropOnFolder = (target: string) => {
+    setDragOver(null);
+    const id = draggingId;
+    setDraggingId(null);
+    if (!id) return;
+    const folderId = target === "none" ? "" : target;
+    const c = contacts.find((x) => x.id === id);
+    if (!c || c.folderId === folderId) return;
+    setContacts((prev) => prev.map((x) => (x.id === id ? { ...x, folderId } : x)));
+    updateContact(id, { folderId })
+      .then(() =>
+        toast.success(
+          folderId
+            ? `Verplaatst naar “${folders.find((f) => f.id === folderId)?.name ?? "map"}”`
+            : "Uit map gehaald",
+        ),
+      )
+      .catch((err) => toast.error("Verplaatsen mislukt: " + (err as Error).message));
+  };
+
 
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -502,13 +612,28 @@ export function CRM() {
 
   /* ---------- Sorting ---------- */
 
+  const visible = useMemo(() => {
+    if (activeFolder === "all") return contacts;
+    if (activeFolder === "none") return contacts.filter((c) => !c.folderId);
+    return contacts.filter((c) => c.folderId === activeFolder);
+  }, [contacts, activeFolder]);
+
   const sorted = useMemo(() => {
-    const arr = [...contacts];
+    const arr = [...visible];
+
     arr.sort((a, b) => {
       let cmp = 0;
       if (sortKey === "name") {
         cmp = a.name.localeCompare(b.name, "nl", { sensitivity: "base" });
+      } else if (sortKey === "folder") {
+        const idx = (c: Contact) => {
+          const i = folders.findIndex((f) => f.id === c.folderId);
+          return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+        };
+        cmp = idx(a) - idx(b);
+        if (cmp === 0) cmp = a.name.localeCompare(b.name, "nl");
       } else if (sortKey === "followUpDate") {
+
         const av = a.followUpDate || "";
         const bv = b.followUpDate || "";
         if (!av && !bv) cmp = 0;
@@ -541,7 +666,7 @@ export function CRM() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return arr;
-  }, [contacts, fields, sortKey, sortDir]);
+  }, [visible, fields, folders, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -553,6 +678,41 @@ export function CRM() {
 
   const deleteTarget = contacts.find((c) => c.id === deleteId) || null;
   const deleteFieldTarget = fields.find((f) => f.id === deleteFieldId) || null;
+  const deleteFolderTarget = folders.find((f) => f.id === deleteFolderId) || null;
+
+  const countFor = (key: string) =>
+    key === "all"
+      ? contacts.length
+      : key === "none"
+        ? contacts.filter((c) => !c.folderId).length
+        : contacts.filter((c) => c.folderId === key).length;
+
+  const dropZone = (key: string, label: string, icon: ReactNode, cls: string) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => setActiveFolder(key)}
+      onDragOver={(e) => {
+        if (key === "all") return;
+        e.preventDefault();
+        setDragOver(key);
+      }}
+      onDragLeave={() => setDragOver((p) => (p === key ? null : p))}
+      onDrop={(e) => {
+        if (key === "all") return;
+        e.preventDefault();
+        dropOnFolder(key);
+      }}
+      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${cls} ${
+        activeFolder === key ? "ring-2 ring-primary" : ""
+      } ${dragOver === key ? "scale-[1.03] ring-2 ring-primary border-dashed" : ""}`}
+    >
+      {icon}
+      <span className="font-medium">{label}</span>
+      <span className="text-xs opacity-70">{countFor(key)}</span>
+    </button>
+  );
+
 
   return (
     <div className="space-y-4">
@@ -601,7 +761,45 @@ export function CRM() {
 
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-          <h2 className="text-lg font-semibold">Contacten ({contacts.length})</h2>
+          <h2 className="text-lg font-semibold">Mappen</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" variant="outline" onClick={() => setFolderOpen(true)}>
+              <FolderPlus className="w-4 h-4 mr-1" />
+              Map toevoegen
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setManageFoldersOpen(true)}
+              disabled={folders.length === 0}
+            >
+              <Settings2 className="w-4 h-4 mr-1" />
+              Mappen beheren
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {dropZone("all", "Alle contacten", <Users className="w-4 h-4" />, "bg-muted")}
+          {dropZone("none", "Zonder map", <Inbox className="w-4 h-4" />, "bg-muted")}
+          {folders.map((f) =>
+            dropZone(f.id, f.name || "Map", <Folder className="w-4 h-4" />, colorClass(f.color)),
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Sleep een contact met het greepje links in de tabel naar een map.
+        </p>
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold">
+            {activeFolder === "all"
+              ? "Alle contacten"
+              : activeFolder === "none"
+                ? "Zonder map"
+                : folders.find((f) => f.id === activeFolder)?.name || "Map"}{" "}
+            ({sorted.length})
+          </h2>
           <div className="flex items-center gap-2 flex-wrap">
             <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
               <Plus className="w-4 h-4 mr-1" />
@@ -613,6 +811,7 @@ export function CRM() {
             </Button>
           </div>
         </div>
+
 
         <div className="flex items-center gap-2 text-sm flex-wrap mb-3">
           <span className="text-muted-foreground">Sorteer:</span>
@@ -637,6 +836,14 @@ export function CRM() {
           >
             Terugcontact <ArrowUpDown className="w-3 h-3 ml-1" />
           </Button>
+          <Button
+            size="sm"
+            variant={sortKey === "folder" ? "default" : "outline"}
+            onClick={() => toggleSort("folder")}
+          >
+            Map <ArrowUpDown className="w-3 h-3 ml-1" />
+          </Button>
+
           {fields.map((f) => (
             <Button
               key={f.id}
@@ -658,6 +865,7 @@ export function CRM() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[36px]"></TableHead>
                   {orderedCols.map((key) => {
                     const b = BUILTIN_COLS.find((x) => x.key === key);
                     if (b)
@@ -677,12 +885,29 @@ export function CRM() {
                       </TableHead>
                     );
                   })}
+                  <TableHead className="min-w-[150px]">Map</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sorted.map((c) => (
-                  <TableRow key={c.id}>
+                  <TableRow
+                    key={c.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggingId(c.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", c.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingId(null);
+                      setDragOver(null);
+                    }}
+                    className={draggingId === c.id ? "opacity-50" : undefined}
+                  >
+                    <TableCell className="cursor-grab active:cursor-grabbing text-muted-foreground">
+                      <GripVertical className="w-4 h-4" />
+                    </TableCell>
                     {orderedCols.map((key) => {
                       if (key.startsWith("b:"))
                         return <TableCell key={key}>{builtinCell(c, key)}</TableCell>;
@@ -690,6 +915,36 @@ export function CRM() {
                       if (!f) return null;
                       return <TableCell key={key}>{customCell(c, f)}</TableCell>;
                     })}
+                    <TableCell>
+                      <Select
+                        value={c.folderId || "__geen"}
+                        onValueChange={(v) => patch(c.id, { folderId: v === "__geen" ? "" : v })}
+                      >
+                        <SelectTrigger
+                          className={`border ${
+                            c.folderId
+                              ? colorClass(folders.find((f) => f.id === c.folderId)?.color ?? "slate")
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <SelectValue placeholder="Geen map" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__geen">
+                            <span className="text-xs text-muted-foreground">Geen map</span>
+                          </SelectItem>
+                          {folders.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded border text-xs ${colorClass(f.color)}`}
+                              >
+                                {f.name || "Map"}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                     <TableCell>
                       <Button
                         size="icon"
@@ -702,6 +957,7 @@ export function CRM() {
                     </TableCell>
                   </TableRow>
                 ))}
+
               </TableBody>
             </Table>
           </div>
@@ -1047,6 +1303,145 @@ export function CRM() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Nieuwe map */}
+      <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nieuwe map</DialogTitle>
+            <DialogDescription>
+              Geef de map een naam en kleur, bv. “Bellen vandaag” of “Later contacteren”.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="fol-name">Naam</Label>
+              <Input
+                id="fol-name"
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                placeholder="bv. Bellen vandaag"
+                maxLength={60}
+              />
+            </div>
+            <div>
+              <Label>Kleur</Label>
+              <Select value={folderColor} onValueChange={setFolderColor}>
+                <SelectTrigger className={`border ${colorClass(folderColor)}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COLORS.map((c) => (
+                    <SelectItem key={c.key} value={c.key}>
+                      <span className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+                        {c.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFolderOpen(false)}>
+              Annuleren
+            </Button>
+            <Button onClick={saveNewFolder}>Map opslaan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mappen beheren */}
+      <Dialog open={manageFoldersOpen} onOpenChange={setManageFoldersOpen}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Mappen beheren</DialogTitle>
+            <DialogDescription>
+              Hernoem mappen, geef ze een andere kleur of zet ze in een andere volgorde.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {folders.map((f, idx) => (
+              <div key={f.id} className="flex items-center gap-2 rounded-lg border p-2">
+                <span className="text-xs text-muted-foreground w-6 text-right">{idx + 1}</span>
+                <Input
+                  value={f.name}
+                  onChange={(e) => patchFolder(f.id, { name: e.target.value })}
+                  maxLength={60}
+                />
+                <Select value={f.color} onValueChange={(v) => patchFolder(f.id, { color: v })}>
+                  <SelectTrigger className={`w-[130px] border ${colorClass(f.color)}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COLORS.map((c) => (
+                      <SelectItem key={c.key} value={c.key}>
+                        <span className="flex items-center gap-2">
+                          <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+                          {c.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Naar boven"
+                  disabled={idx === 0}
+                  onClick={() => moveFolder(f.id, -1)}
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Naar onder"
+                  disabled={idx === folders.length - 1}
+                  onClick={() => moveFolder(f.id, 1)}
+                >
+                  <ArrowDown className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Map verwijderen"
+                  onClick={() => setDeleteFolderId(f.id)}
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setManageFoldersOpen(false)}>Sluiten</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteFolderId} onOpenChange={(o) => !o && setDeleteFolderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Map verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteFolderTarget
+                ? `De map "${deleteFolderTarget.name}" wordt verwijderd. De contacten blijven bestaan en komen bij “Zonder map”.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteFolderId && removeFolder(deleteFolderId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
   );
 }
