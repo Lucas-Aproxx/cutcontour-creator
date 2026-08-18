@@ -849,6 +849,7 @@ export function CRM() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[36px]"></TableHead>
                   {orderedCols.map((key) => {
                     const b = BUILTIN_COLS.find((x) => x.key === key);
                     if (b)
@@ -868,12 +869,29 @@ export function CRM() {
                       </TableHead>
                     );
                   })}
+                  <TableHead className="min-w-[150px]">Map</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sorted.map((c) => (
-                  <TableRow key={c.id}>
+                  <TableRow
+                    key={c.id}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggingId(c.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", c.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingId(null);
+                      setDragOver(null);
+                    }}
+                    className={draggingId === c.id ? "opacity-50" : undefined}
+                  >
+                    <TableCell className="cursor-grab active:cursor-grabbing text-muted-foreground">
+                      <GripVertical className="w-4 h-4" />
+                    </TableCell>
                     {orderedCols.map((key) => {
                       if (key.startsWith("b:"))
                         return <TableCell key={key}>{builtinCell(c, key)}</TableCell>;
@@ -881,6 +899,36 @@ export function CRM() {
                       if (!f) return null;
                       return <TableCell key={key}>{customCell(c, f)}</TableCell>;
                     })}
+                    <TableCell>
+                      <Select
+                        value={c.folderId || "__geen"}
+                        onValueChange={(v) => patch(c.id, { folderId: v === "__geen" ? "" : v })}
+                      >
+                        <SelectTrigger
+                          className={`border ${
+                            c.folderId
+                              ? colorClass(folders.find((f) => f.id === c.folderId)?.color ?? "slate")
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <SelectValue placeholder="Geen map" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__geen">
+                            <span className="text-xs text-muted-foreground">Geen map</span>
+                          </SelectItem>
+                          {folders.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded border text-xs ${colorClass(f.color)}`}
+                              >
+                                {f.name || "Map"}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                     <TableCell>
                       <Button
                         size="icon"
@@ -893,6 +941,7 @@ export function CRM() {
                     </TableCell>
                   </TableRow>
                 ))}
+
               </TableBody>
             </Table>
           </div>
