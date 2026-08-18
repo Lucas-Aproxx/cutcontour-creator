@@ -836,6 +836,14 @@ export function CRM() {
           >
             Terugcontact <ArrowUpDown className="w-3 h-3 ml-1" />
           </Button>
+          <Button
+            size="sm"
+            variant={sortKey === "folder" ? "default" : "outline"}
+            onClick={() => toggleSort("folder")}
+          >
+            Map <ArrowUpDown className="w-3 h-3 ml-1" />
+          </Button>
+
           {fields.map((f) => (
             <Button
               key={f.id}
