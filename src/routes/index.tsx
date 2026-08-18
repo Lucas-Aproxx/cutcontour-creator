@@ -44,7 +44,7 @@ function Landing() {
         </p>
         <div className="flex justify-center gap-3">
           <Button asChild size="lg">
-            <Link to="/auth">Inloggen of registreren</Link>
+            <Link to="/auth">Inloggen</Link>
           </Button>
         </div>
       </div>
