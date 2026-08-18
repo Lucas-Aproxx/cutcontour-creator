@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
+import { Route as ApiPublicSeedUserRouteImport } from './routes/api/public/seed-user'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -33,16 +34,23 @@ const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   path: '/app',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicSeedUserRoute = ApiPublicSeedUserRouteImport.update({
+  id: '/api/public/seed-user',
+  path: '/api/public/seed-user',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/api/public/seed-user': typeof ApiPublicSeedUserRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/api/public/seed-user': typeof ApiPublicSeedUserRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -50,19 +58,27 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
+  '/api/public/seed-user': typeof ApiPublicSeedUserRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/app'
+  fullPaths: '/' | '/auth' | '/app' | '/api/public/seed-user'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/app'
-  id: '__root__' | '/' | '/_authenticated' | '/auth' | '/_authenticated/app'
+  to: '/' | '/auth' | '/app' | '/api/public/seed-user'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/app'
+    | '/api/public/seed-user'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicSeedUserRoute: typeof ApiPublicSeedUserRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -95,6 +111,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/seed-user': {
+      id: '/api/public/seed-user'
+      path: '/api/public/seed-user'
+      fullPath: '/api/public/seed-user'
+      preLoaderRoute: typeof ApiPublicSeedUserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -113,6 +136,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicSeedUserRoute: ApiPublicSeedUserRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
