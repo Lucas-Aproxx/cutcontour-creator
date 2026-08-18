@@ -817,6 +817,27 @@ export function CRM() {
                 </Button>
               </div>
             )}
+
+            <div>
+              <Label>Plaats in de tabel</Label>
+              <Select
+                value={String(insertIndex)}
+                onValueChange={(v) => setInsertIndex(Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="-1">Helemaal achteraan</SelectItem>
+                  <SelectItem value="0">Helemaal vooraan</SelectItem>
+                  {orderedCols.map((k, i) => (
+                    <SelectItem key={k} value={String(i + 1)}>
+                      Na “{colLabel(k)}”
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>
