@@ -607,14 +607,9 @@ export function CRM() {
               <Plus className="w-4 h-4 mr-1" />
               Veld toevoegen
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setManageOpen(true)}
-              disabled={fields.length === 0}
-            >
+            <Button size="sm" variant="outline" onClick={() => setManageOpen(true)}>
               <Settings2 className="w-4 h-4 mr-1" />
-              Velden beheren
+              Kolommen beheren
             </Button>
           </div>
         </div>
