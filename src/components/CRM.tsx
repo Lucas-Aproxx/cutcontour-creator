@@ -21,6 +21,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -30,16 +38,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, ArrowUpDown } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  ArrowUpDown,
+  Settings2,
+  ArrowUp,
+  ArrowDown,
+  X,
+} from "lucide-react";
 
 import {
   listContacts,
   createContact,
   updateContact,
   deleteContactById,
+  listCrmFields,
+  createCrmField,
+  updateCrmField,
+  deleteCrmField,
   type Contact,
   type ContactStatus,
   type ContactFlag,
+  type CrmField,
+  type CrmFieldType,
+  type CrmFieldOption,
 } from "@/lib/data";
 
 const STATUS_LABEL: Record<ContactStatus, string> = {
@@ -68,6 +91,29 @@ const FLAG_CLASS: Record<ContactFlag, string> = {
     "bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-900/40 dark:text-sky-100",
 };
 
+/* ---------- Kleurenpalet voor eigen dropdown-opties ---------- */
+
+const COLORS: { key: string; label: string; cls: string; dot: string }[] = [
+  { key: "slate", label: "Grijs", cls: "bg-slate-100 text-slate-900 border-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600", dot: "bg-slate-400" },
+  { key: "red", label: "Rood", cls: "bg-red-100 text-red-900 border-red-300 dark:bg-red-900/40 dark:text-red-100 dark:border-red-700", dot: "bg-red-500" },
+  { key: "orange", label: "Oranje", cls: "bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-900/40 dark:text-orange-100 dark:border-orange-700", dot: "bg-orange-500" },
+  { key: "amber", label: "Geel", cls: "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-700", dot: "bg-amber-500" },
+  { key: "emerald", label: "Groen", cls: "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-700", dot: "bg-emerald-500" },
+  { key: "sky", label: "Blauw", cls: "bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-900/40 dark:text-sky-100 dark:border-sky-700", dot: "bg-sky-500" },
+  { key: "violet", label: "Paars", cls: "bg-violet-100 text-violet-900 border-violet-300 dark:bg-violet-900/40 dark:text-violet-100 dark:border-violet-700", dot: "bg-violet-500" },
+  { key: "pink", label: "Roze", cls: "bg-pink-100 text-pink-900 border-pink-300 dark:bg-pink-900/40 dark:text-pink-100 dark:border-pink-700", dot: "bg-pink-500" },
+];
+
+function colorClass(key: string): string {
+  return (COLORS.find((c) => c.key === key) ?? COLORS[0]).cls;
+}
+
+const FIELD_TYPE_LABEL: Record<CrmFieldType, string> = {
+  dropdown: "Dropdown",
+  text: "Klein tekstvak",
+  longtext: "Groot tekstvak",
+};
+
 const STATUS_SORT_ORDER: string[] = [
   "niet_gecontacteerd",
   "later_contacteren",
@@ -81,24 +127,48 @@ function contactSortKey(c: Contact): string {
   return c.status;
 }
 
-type SortKey = "name" | "status" | "followUpDate";
+type SortKey = "name" | "status" | "followUpDate" | `custom:${string}`;
 type SortDir = "asc" | "desc";
+
+interface DraftOption {
+  id: string;
+  label: string;
+  color: string;
+}
+
+function newOptionId(): string {
+  return `opt-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 export function CRM() {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [fields, setFields] = useState<CrmField[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("status");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteFieldId, setDeleteFieldId] = useState<string | null>(null);
 
   // New contact form
   const [nName, setNName] = useState("");
   const [nPhone, setNPhone] = useState("");
   const [nEmail, setNEmail] = useState("");
 
+  // Field dialogs
+  const [addOpen, setAddOpen] = useState(false);
+  const [fName, setFName] = useState("");
+  const [fType, setFType] = useState<CrmFieldType>("dropdown");
+  const [fOptions, setFOptions] = useState<DraftOption[]>([
+    { id: newOptionId(), label: "", color: "sky" },
+  ]);
+  const [manageOpen, setManageOpen] = useState(false);
+
   useEffect(() => {
     listContacts()
       .then(setContacts)
       .catch((err) => toast.error("Contacten laden mislukt: " + (err as Error).message));
+    listCrmFields()
+      .then(setFields)
+      .catch((err) => toast.error("Velden laden mislukt: " + (err as Error).message));
   }, []);
 
   const addContact = async () => {
@@ -135,6 +205,10 @@ export function CRM() {
     }, 500);
   };
 
+  const patchCustom = (c: Contact, fieldId: string, value: string) => {
+    patch(c.id, { custom: { ...c.custom, [fieldId]: value } });
+  };
+
   const remove = async (id: string) => {
     try {
       await deleteContactById(id);
@@ -145,6 +219,100 @@ export function CRM() {
       toast.error("Verwijderen mislukt: " + (err as Error).message);
     }
   };
+
+  /* ---------- Field management ---------- */
+
+  const resetFieldForm = () => {
+    setFName("");
+    setFType("dropdown");
+    setFOptions([{ id: newOptionId(), label: "", color: "sky" }]);
+  };
+
+  const saveNewField = async () => {
+    const name = fName.trim();
+    if (!name) {
+      toast.error("Geef het veld een naam");
+      return;
+    }
+    const options: CrmFieldOption[] =
+      fType === "dropdown"
+        ? fOptions
+            .filter((o) => o.label.trim())
+            .map((o) => ({ id: o.id, label: o.label.trim(), color: o.color }))
+        : [];
+    if (fType === "dropdown" && options.length === 0) {
+      toast.error("Voeg minstens één optie toe");
+      return;
+    }
+    try {
+      const created = await createCrmField({
+        name,
+        type: fType,
+        options,
+        position: fields.length,
+      });
+      setFields((prev) => [...prev, created]);
+      setAddOpen(false);
+      resetFieldForm();
+      toast.success("Veld toegevoegd");
+    } catch (err) {
+      toast.error("Veld opslaan mislukt: " + (err as Error).message);
+    }
+  };
+
+  const fieldTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const patchField = (
+    id: string,
+    p: Partial<Pick<CrmField, "name" | "options" | "position">>,
+  ) => {
+    setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...p } : f)));
+    const existing = fieldTimers.current[id];
+    if (existing) clearTimeout(existing);
+    fieldTimers.current[id] = setTimeout(() => {
+      updateCrmField(id, p).catch((err) =>
+        toast.error("Veld opslaan mislukt: " + (err as Error).message),
+      );
+    }, 500);
+  };
+
+  const moveField = async (id: string, dir: -1 | 1) => {
+    const idx = fields.findIndex((f) => f.id === id);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= fields.length) return;
+    const next = [...fields];
+    const [item] = next.splice(idx, 1);
+    next.splice(target, 0, item);
+    const withPos = next.map((f, i) => ({ ...f, position: i }));
+    setFields(withPos);
+    try {
+      await Promise.all(
+        withPos.map((f) => updateCrmField(f.id, { position: f.position })),
+      );
+    } catch (err) {
+      toast.error("Volgorde opslaan mislukt: " + (err as Error).message);
+    }
+  };
+
+  const removeField = async (id: string) => {
+    try {
+      await deleteCrmField(id);
+      setFields((prev) => prev.filter((f) => f.id !== id));
+      setDeleteFieldId(null);
+      if (sortKey === `custom:${id}`) setSortKey("status");
+      toast.success("Veld verwijderd");
+    } catch (err) {
+      toast.error("Verwijderen mislukt: " + (err as Error).message);
+    }
+  };
+
+  const addOptionTo = (field: CrmField) => {
+    patchField(field.id, {
+      options: [...field.options, { id: newOptionId(), label: "Nieuwe optie", color: "slate" }],
+    });
+  };
+
+  /* ---------- Sorting ---------- */
 
   const sorted = useMemo(() => {
     const arr = [...contacts];
@@ -159,8 +327,24 @@ export function CRM() {
         else if (!av) cmp = 1;
         else if (!bv) cmp = -1;
         else cmp = av.localeCompare(bv);
+      } else if (sortKey.startsWith("custom:")) {
+        const fid = sortKey.slice(7);
+        const field = fields.find((f) => f.id === fid);
+        const av = a.custom[fid] ?? "";
+        const bv = b.custom[fid] ?? "";
+        if (field?.type === "dropdown") {
+          const order = field.options.map((o) => o.id);
+          const ai = av ? order.indexOf(av) : Number.MAX_SAFE_INTEGER;
+          const bi = bv ? order.indexOf(bv) : Number.MAX_SAFE_INTEGER;
+          cmp = (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi);
+        } else {
+          if (!av && !bv) cmp = 0;
+          else if (!av) cmp = 1;
+          else if (!bv) cmp = -1;
+          else cmp = av.localeCompare(bv, "nl", { sensitivity: "base" });
+        }
+        if (cmp === 0) cmp = a.name.localeCompare(b.name, "nl");
       } else {
-        // status
         const ai = STATUS_SORT_ORDER.indexOf(contactSortKey(a));
         const bi = STATUS_SORT_ORDER.indexOf(contactSortKey(b));
         cmp = ai - bi;
@@ -169,7 +353,7 @@ export function CRM() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return arr;
-  }, [contacts, sortKey, sortDir]);
+  }, [contacts, fields, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -180,6 +364,7 @@ export function CRM() {
   };
 
   const deleteTarget = contacts.find((c) => c.id === deleteId) || null;
+  const deleteFieldTarget = fields.find((f) => f.id === deleteFieldId) || null;
 
   return (
     <div className="space-y-4">
@@ -229,30 +414,56 @@ export function CRM() {
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="text-lg font-semibold">Contacten ({contacts.length})</h2>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Sorteer:</span>
-            <Button
-              size="sm"
-              variant={sortKey === "status" ? "default" : "outline"}
-              onClick={() => toggleSort("status")}
-            >
-              Status <ArrowUpDown className="w-3 h-3 ml-1" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" />
+              Veld toevoegen
             </Button>
             <Button
               size="sm"
-              variant={sortKey === "name" ? "default" : "outline"}
-              onClick={() => toggleSort("name")}
+              variant="outline"
+              onClick={() => setManageOpen(true)}
+              disabled={fields.length === 0}
             >
-              Naam <ArrowUpDown className="w-3 h-3 ml-1" />
-            </Button>
-            <Button
-              size="sm"
-              variant={sortKey === "followUpDate" ? "default" : "outline"}
-              onClick={() => toggleSort("followUpDate")}
-            >
-              Terugcontact <ArrowUpDown className="w-3 h-3 ml-1" />
+              <Settings2 className="w-4 h-4 mr-1" />
+              Velden beheren
             </Button>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm flex-wrap mb-3">
+          <span className="text-muted-foreground">Sorteer:</span>
+          <Button
+            size="sm"
+            variant={sortKey === "status" ? "default" : "outline"}
+            onClick={() => toggleSort("status")}
+          >
+            Status <ArrowUpDown className="w-3 h-3 ml-1" />
+          </Button>
+          <Button
+            size="sm"
+            variant={sortKey === "name" ? "default" : "outline"}
+            onClick={() => toggleSort("name")}
+          >
+            Naam <ArrowUpDown className="w-3 h-3 ml-1" />
+          </Button>
+          <Button
+            size="sm"
+            variant={sortKey === "followUpDate" ? "default" : "outline"}
+            onClick={() => toggleSort("followUpDate")}
+          >
+            Terugcontact <ArrowUpDown className="w-3 h-3 ml-1" />
+          </Button>
+          {fields.map((f) => (
+            <Button
+              key={f.id}
+              size="sm"
+              variant={sortKey === `custom:${f.id}` ? "default" : "outline"}
+              onClick={() => toggleSort(`custom:${f.id}`)}
+            >
+              {f.name || "Veld"} <ArrowUpDown className="w-3 h-3 ml-1" />
+            </Button>
+          ))}
         </div>
 
         {sorted.length === 0 ? (
@@ -271,6 +482,14 @@ export function CRM() {
                   <TableHead className="min-w-[180px]">Markering</TableHead>
                   <TableHead className="min-w-[160px]">Terugcontact</TableHead>
                   <TableHead className="min-w-[220px]">Notitie</TableHead>
+                  {fields.map((f) => (
+                    <TableHead
+                      key={f.id}
+                      className={f.type === "longtext" ? "min-w-[220px]" : "min-w-[170px]"}
+                    >
+                      {f.name || "Veld"}
+                    </TableHead>
+                  ))}
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -367,6 +586,68 @@ export function CRM() {
                         className="min-h-[40px]"
                       />
                     </TableCell>
+                    {fields.map((f) => {
+                      const val = c.custom[f.id] ?? "";
+                      if (f.type === "dropdown") {
+                        const active = f.options.find((o) => o.id === val);
+                        return (
+                          <TableCell key={f.id}>
+                            <Select
+                              value={val || "__leeg"}
+                              onValueChange={(v) =>
+                                patchCustom(c, f.id, v === "__leeg" ? "" : v)
+                              }
+                            >
+                              <SelectTrigger
+                                className={`border ${
+                                  active ? colorClass(active.color) : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                <SelectValue placeholder="Kies…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__leeg">
+                                  <span className="text-xs text-muted-foreground">
+                                    Leeg
+                                  </span>
+                                </SelectItem>
+                                {f.options.map((o) => (
+                                  <SelectItem key={o.id} value={o.id}>
+                                    <span
+                                      className={`inline-block px-2 py-0.5 rounded border text-xs ${colorClass(o.color)}`}
+                                    >
+                                      {o.label}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        );
+                      }
+                      if (f.type === "longtext") {
+                        return (
+                          <TableCell key={f.id}>
+                            <Textarea
+                              value={val}
+                              onChange={(e) => patchCustom(c, f.id, e.target.value)}
+                              rows={2}
+                              maxLength={5000}
+                              className="min-h-[40px]"
+                            />
+                          </TableCell>
+                        );
+                      }
+                      return (
+                        <TableCell key={f.id}>
+                          <Input
+                            value={val}
+                            onChange={(e) => patchCustom(c, f.id, e.target.value)}
+                            maxLength={255}
+                          />
+                        </TableCell>
+                      );
+                    })}
                     <TableCell>
                       <Button
                         size="icon"
@@ -385,6 +666,242 @@ export function CRM() {
         )}
       </Card>
 
+      {/* Nieuw veld */}
+      <Dialog
+        open={addOpen}
+        onOpenChange={(o) => {
+          setAddOpen(o);
+          if (!o) resetFieldForm();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nieuw veld toevoegen</DialogTitle>
+            <DialogDescription>
+              Kies een naam en een type. Het veld verschijnt als extra kolom bij
+              elk contact.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="fld-name">Naam</Label>
+              <Input
+                id="fld-name"
+                value={fName}
+                onChange={(e) => setFName(e.target.value)}
+                placeholder="bv. Bron, Bedrijf, Verslag"
+                maxLength={60}
+              />
+            </div>
+            <div>
+              <Label>Type</Label>
+              <Select value={fType} onValueChange={(v) => setFType(v as CrmFieldType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(FIELD_TYPE_LABEL) as CrmFieldType[]).map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {FIELD_TYPE_LABEL[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {fType === "dropdown" && (
+              <div className="space-y-2">
+                <Label>Opties</Label>
+                {fOptions.map((o, i) => (
+                  <div key={o.id} className="flex items-center gap-2">
+                    <Input
+                      value={o.label}
+                      onChange={(e) =>
+                        setFOptions((prev) =>
+                          prev.map((p, pi) =>
+                            pi === i ? { ...p, label: e.target.value } : p,
+                          ),
+                        )
+                      }
+                      placeholder={`Optie ${i + 1}`}
+                      maxLength={60}
+                    />
+                    <Select
+                      value={o.color}
+                      onValueChange={(v) =>
+                        setFOptions((prev) =>
+                          prev.map((p, pi) => (pi === i ? { ...p, color: v } : p)),
+                        )
+                      }
+                    >
+                      <SelectTrigger className={`w-[130px] border ${colorClass(o.color)}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COLORS.map((c) => (
+                          <SelectItem key={c.key} value={c.key}>
+                            <span className="flex items-center gap-2">
+                              <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+                              {c.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Optie verwijderen"
+                      onClick={() =>
+                        setFOptions((prev) => prev.filter((_, pi) => pi !== i))
+                      }
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setFOptions((prev) => [
+                      ...prev,
+                      { id: newOptionId(), label: "", color: "slate" },
+                    ])
+                  }
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Optie toevoegen
+                </Button>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Annuleren
+            </Button>
+            <Button onClick={saveNewField}>Veld opslaan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Velden beheren */}
+      <Dialog open={manageOpen} onOpenChange={setManageOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Velden beheren</DialogTitle>
+            <DialogDescription>
+              Wijzig namen, kleuren, opties en de volgorde van je eigen velden.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {fields.map((f, idx) => (
+              <div key={f.id} className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={f.name}
+                    onChange={(e) => patchField(f.id, { name: e.target.value })}
+                    maxLength={60}
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {FIELD_TYPE_LABEL[f.type]}
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Omhoog"
+                    disabled={idx === 0}
+                    onClick={() => moveField(f.id, -1)}
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Omlaag"
+                    disabled={idx === fields.length - 1}
+                    onClick={() => moveField(f.id, 1)}
+                  >
+                    <ArrowDown className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Veld verwijderen"
+                    onClick={() => setDeleteFieldId(f.id)}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+
+                {f.type === "dropdown" && (
+                  <div className="space-y-2">
+                    {f.options.map((o, oi) => (
+                      <div key={o.id} className="flex items-center gap-2">
+                        <Input
+                          value={o.label}
+                          onChange={(e) =>
+                            patchField(f.id, {
+                              options: f.options.map((p, pi) =>
+                                pi === oi ? { ...p, label: e.target.value } : p,
+                              ),
+                            })
+                          }
+                          maxLength={60}
+                        />
+                        <Select
+                          value={o.color}
+                          onValueChange={(v) =>
+                            patchField(f.id, {
+                              options: f.options.map((p, pi) =>
+                                pi === oi ? { ...p, color: v } : p,
+                              ),
+                            })
+                          }
+                        >
+                          <SelectTrigger className={`w-[130px] border ${colorClass(o.color)}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COLORS.map((c) => (
+                              <SelectItem key={c.key} value={c.key}>
+                                <span className="flex items-center gap-2">
+                                  <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+                                  {c.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Optie verwijderen"
+                          onClick={() =>
+                            patchField(f.id, {
+                              options: f.options.filter((_, pi) => pi !== oi),
+                            })
+                          }
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button size="sm" variant="outline" onClick={() => addOptionTo(f)}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Optie toevoegen
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setManageOpen(false)}>Sluiten</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
@@ -402,6 +919,31 @@ export function CRM() {
             <AlertDialogCancel>Annuleren</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteId && remove(deleteId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!deleteFieldId}
+        onOpenChange={(o) => !o && setDeleteFieldId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Veld verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteFieldTarget
+                ? `De kolom "${deleteFieldTarget.name}" verdwijnt uit je CRM. Ingevulde waarden worden niet meer weergegeven.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteFieldId && removeField(deleteFieldId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Verwijderen

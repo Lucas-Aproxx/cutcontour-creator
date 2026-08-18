@@ -17,6 +17,7 @@ export type Database = {
       contacts: {
         Row: {
           created_at: string
+          custom: Json
           email: string
           flag: string
           follow_up_date: string | null
@@ -30,6 +31,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom?: Json
           email?: string
           flag?: string
           follow_up_date?: string | null
@@ -43,6 +45,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom?: Json
           email?: string
           flag?: string
           follow_up_date?: string | null
@@ -51,6 +54,39 @@ export type Database = {
           note?: string
           phone?: string
           status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      crm_fields: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          options: Json
+          position: number
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          options?: Json
+          position?: number
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          options?: Json
+          position?: number
+          type?: string
           updated_at?: string
           user_id?: string
         }

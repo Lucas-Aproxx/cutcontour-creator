@@ -28,7 +28,43 @@ export interface Contact {
   flag: ContactFlag;
   followUpDate: string;
   note: string;
+  custom: Record<string, string>;
 }
+
+export type CrmFieldType = "dropdown" | "text" | "longtext";
+
+export interface CrmFieldOption {
+  id: string;
+  label: string;
+  color: string;
+}
+
+export interface CrmField {
+  id: string;
+  name: string;
+  type: CrmFieldType;
+  options: CrmFieldOption[];
+  position: number;
+}
+
+function normOptions(raw: unknown): CrmFieldOption[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((o: any, i: number) => ({
+    id: String(o?.id ?? `opt-${i}`),
+    label: String(o?.label ?? ""),
+    color: String(o?.color ?? "slate"),
+  }));
+}
+
+function normCustom(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    out[k] = v == null ? "" : String(v);
+  }
+  return out;
+}
+
 
 function normShapes(raw: unknown): PresetShape[] {
   if (!Array.isArray(raw)) return [];
@@ -86,10 +122,10 @@ export async function deletePresetById(id: string): Promise<void> {
 export async function listContacts(): Promise<Contact[]> {
   const { data, error } = await supabase
     .from("contacts")
-    .select("id, name, phone, email, status, flag, follow_up_date, note")
+    .select("id, name, phone, email, status, flag, follow_up_date, note, custom")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((r) => ({
+  return (data ?? []).map((r: any) => ({
     id: r.id,
     name: r.name ?? "",
     phone: r.phone ?? "",
@@ -98,6 +134,7 @@ export async function listContacts(): Promise<Contact[]> {
     flag: (r.flag as ContactFlag) ?? "geen",
     followUpDate: r.follow_up_date ?? "",
     note: r.note ?? "",
+    custom: normCustom(r.custom),
   }));
 }
 
@@ -110,36 +147,102 @@ export async function createContact(input: {
   const { data, error } = await supabase
     .from("contacts")
     .insert({ user_id: userId, ...input })
-    .select("id, name, phone, email, status, flag, follow_up_date, note")
+    .select("id, name, phone, email, status, flag, follow_up_date, note, custom")
     .single();
   if (error) throw error;
+  const r = data as any;
   return {
-    id: data.id,
-    name: data.name ?? "",
-    phone: data.phone ?? "",
-    email: data.email ?? "",
-    status: (data.status as ContactStatus) ?? "niet_gecontacteerd",
-    flag: (data.flag as ContactFlag) ?? "geen",
-    followUpDate: data.follow_up_date ?? "",
-    note: data.note ?? "",
+    id: r.id,
+    name: r.name ?? "",
+    phone: r.phone ?? "",
+    email: r.email ?? "",
+    status: (r.status as ContactStatus) ?? "niet_gecontacteerd",
+    flag: (r.flag as ContactFlag) ?? "geen",
+    followUpDate: r.follow_up_date ?? "",
+    note: r.note ?? "",
+    custom: normCustom(r.custom),
   };
 }
 
 export async function updateContact(id: string, patch: Partial<Contact>): Promise<void> {
-  const row: {
-    name?: string; phone?: string; email?: string; status?: string; flag?: string; note?: string; follow_up_date?: string | null;
-  } = {};
+  const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.phone !== undefined) row.phone = patch.phone;
   if (patch.email !== undefined) row.email = patch.email;
   if (patch.status !== undefined) row.status = patch.status;
   if (patch.flag !== undefined) row.flag = patch.flag;
   if (patch.note !== undefined) row.note = patch.note;
+  if (patch.custom !== undefined) row.custom = patch.custom;
   if (patch.followUpDate !== undefined) row.follow_up_date = patch.followUpDate || null;
   if (Object.keys(row).length === 0) return;
-  const { error } = await supabase.from("contacts").update(row).eq("id", id);
+  const { error } = await supabase.from("contacts").update(row as any).eq("id", id);
   if (error) throw error;
 }
+
+/* ---------------- Custom CRM fields ---------------- */
+
+export async function listCrmFields(): Promise<CrmField[]> {
+  const { data, error } = await (supabase as any)
+    .from("crm_fields")
+    .select("id, name, type, options, position")
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    name: r.name ?? "",
+    type: (["dropdown", "text", "longtext"].includes(r.type) ? r.type : "text") as CrmFieldType,
+    options: normOptions(r.options),
+    position: Number(r.position) || 0,
+  }));
+}
+
+export async function createCrmField(input: {
+  name: string;
+  type: CrmFieldType;
+  options: CrmFieldOption[];
+  position: number;
+}): Promise<CrmField> {
+  const userId = await requireUserId();
+  const { data, error } = await (supabase as any)
+    .from("crm_fields")
+    .insert({
+      user_id: userId,
+      name: input.name,
+      type: input.type,
+      options: input.options,
+      position: input.position,
+    })
+    .select("id, name, type, options, position")
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    name: data.name ?? "",
+    type: data.type as CrmFieldType,
+    options: normOptions(data.options),
+    position: Number(data.position) || 0,
+  };
+}
+
+export async function updateCrmField(
+  id: string,
+  patch: Partial<Pick<CrmField, "name" | "options" | "position">>,
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.options !== undefined) row.options = patch.options;
+  if (patch.position !== undefined) row.position = patch.position;
+  if (Object.keys(row).length === 0) return;
+  const { error } = await (supabase as any).from("crm_fields").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCrmField(id: string): Promise<void> {
+  const { error } = await (supabase as any).from("crm_fields").delete().eq("id", id);
+  if (error) throw error;
+}
+
 
 export async function deleteContactById(id: string): Promise<void> {
   const { error } = await supabase.from("contacts").delete().eq("id", id);
