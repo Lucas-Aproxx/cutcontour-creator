@@ -658,7 +658,7 @@ export function CRM() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return arr;
-  }, [contacts, fields, sortKey, sortDir]);
+  }, [visible, fields, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -670,6 +670,41 @@ export function CRM() {
 
   const deleteTarget = contacts.find((c) => c.id === deleteId) || null;
   const deleteFieldTarget = fields.find((f) => f.id === deleteFieldId) || null;
+  const deleteFolderTarget = folders.find((f) => f.id === deleteFolderId) || null;
+
+  const countFor = (key: string) =>
+    key === "all"
+      ? contacts.length
+      : key === "none"
+        ? contacts.filter((c) => !c.folderId).length
+        : contacts.filter((c) => c.folderId === key).length;
+
+  const dropZone = (key: string, label: string, icon: React.ReactNode, cls: string) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => setActiveFolder(key)}
+      onDragOver={(e) => {
+        if (key === "all") return;
+        e.preventDefault();
+        setDragOver(key);
+      }}
+      onDragLeave={() => setDragOver((p) => (p === key ? null : p))}
+      onDrop={(e) => {
+        if (key === "all") return;
+        e.preventDefault();
+        dropOnFolder(key);
+      }}
+      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${cls} ${
+        activeFolder === key ? "ring-2 ring-primary" : ""
+      } ${dragOver === key ? "scale-[1.03] ring-2 ring-primary border-dashed" : ""}`}
+    >
+      {icon}
+      <span className="font-medium">{label}</span>
+      <span className="text-xs opacity-70">{countFor(key)}</span>
+    </button>
+  );
+
 
   return (
     <div className="space-y-4">
