@@ -666,7 +666,7 @@ export function CRM() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return arr;
-  }, [visible, fields, sortKey, sortDir]);
+  }, [visible, fields, folders, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
