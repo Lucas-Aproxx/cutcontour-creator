@@ -46,6 +46,11 @@ import {
   ArrowUp,
   ArrowDown,
   X,
+  Folder,
+  FolderPlus,
+  GripVertical,
+  Inbox,
+  Users,
 } from "lucide-react";
 
 import {
@@ -59,13 +64,19 @@ import {
   deleteCrmField,
   getCrmLayout,
   saveCrmLayout,
+  listCrmFolders,
+  createCrmFolder,
+  updateCrmFolder,
+  deleteCrmFolder,
   type Contact,
   type ContactStatus,
   type ContactFlag,
   type CrmField,
   type CrmFieldType,
   type CrmFieldOption,
+  type CrmFolder,
 } from "@/lib/data";
+
 
 const STATUS_LABEL: Record<ContactStatus, string> = {
   niet_gecontacteerd: "Niet gecontacteerd",
