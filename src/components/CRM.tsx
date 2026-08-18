@@ -753,7 +753,45 @@ export function CRM() {
 
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-          <h2 className="text-lg font-semibold">Contacten ({contacts.length})</h2>
+          <h2 className="text-lg font-semibold">Mappen</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" variant="outline" onClick={() => setFolderOpen(true)}>
+              <FolderPlus className="w-4 h-4 mr-1" />
+              Map toevoegen
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setManageFoldersOpen(true)}
+              disabled={folders.length === 0}
+            >
+              <Settings2 className="w-4 h-4 mr-1" />
+              Mappen beheren
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {dropZone("all", "Alle contacten", <Users className="w-4 h-4" />, "bg-muted")}
+          {dropZone("none", "Zonder map", <Inbox className="w-4 h-4" />, "bg-muted")}
+          {folders.map((f) =>
+            dropZone(f.id, f.name || "Map", <Folder className="w-4 h-4" />, colorClass(f.color)),
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Sleep een contact met het greepje links in de tabel naar een map.
+        </p>
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold">
+            {activeFolder === "all"
+              ? "Alle contacten"
+              : activeFolder === "none"
+                ? "Zonder map"
+                : folders.find((f) => f.id === activeFolder)?.name || "Map"}{" "}
+            ({sorted.length})
+          </h2>
           <div className="flex items-center gap-2 flex-wrap">
             <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
               <Plus className="w-4 h-4 mr-1" />
@@ -765,6 +803,7 @@ export function CRM() {
             </Button>
           </div>
         </div>
+
 
         <div className="flex items-center gap-2 text-sm flex-wrap mb-3">
           <span className="text-muted-foreground">Sorteer:</span>
