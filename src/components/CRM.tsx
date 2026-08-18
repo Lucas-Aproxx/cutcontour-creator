@@ -292,7 +292,7 @@ export function CRM() {
 
   const patchField = (
     id: string,
-    p: Partial<Pick<CrmField, "name" | "options" | "position">>,
+    p: Partial<Pick<CrmField, "name" | "options" | "position" | "type">>,
   ) => {
     setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...p } : f)));
     const existing = fieldTimers.current[id];
