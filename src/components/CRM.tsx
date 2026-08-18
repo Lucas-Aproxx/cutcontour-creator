@@ -518,178 +518,37 @@ export function CRM() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[160px]">Naam</TableHead>
-                  <TableHead className="min-w-[140px]">Telefoon</TableHead>
-                  <TableHead className="min-w-[180px]">Email</TableHead>
-                  <TableHead className="min-w-[190px]">Status</TableHead>
-                  <TableHead className="min-w-[180px]">Markering</TableHead>
-                  <TableHead className="min-w-[160px]">Terugcontact</TableHead>
-                  <TableHead className="min-w-[220px]">Notitie</TableHead>
-                  {fields.map((f) => (
-                    <TableHead
-                      key={f.id}
-                      className={f.type === "longtext" ? "min-w-[220px]" : "min-w-[170px]"}
-                    >
-                      {f.name || "Veld"}
-                    </TableHead>
-                  ))}
+                  {orderedCols.map((key) => {
+                    const b = BUILTIN_COLS.find((x) => x.key === key);
+                    if (b)
+                      return (
+                        <TableHead key={key} className={b.width}>
+                          {b.label}
+                        </TableHead>
+                      );
+                    const f = fields.find((x) => `f:${x.id}` === key);
+                    if (!f) return null;
+                    return (
+                      <TableHead
+                        key={key}
+                        className={f.type === "longtext" ? "min-w-[220px]" : "min-w-[170px]"}
+                      >
+                        {f.name || "Veld"}
+                      </TableHead>
+                    );
+                  })}
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sorted.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell>
-                      <Input
-                        value={c.name}
-                        onChange={(e) => patch(c.id, { name: e.target.value })}
-                        maxLength={100}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={c.phone}
-                        onChange={(e) => patch(c.id, { phone: e.target.value })}
-                        maxLength={30}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="email"
-                        value={c.email}
-                        onChange={(e) => patch(c.id, { email: e.target.value })}
-                        maxLength={255}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={c.status}
-                        onValueChange={(v) =>
-                          patch(c.id, { status: v as ContactStatus })
-                        }
-                      >
-                        <SelectTrigger
-                          className={`border ${STATUS_CLASS[c.status]}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(STATUS_LABEL) as ContactStatus[]).map(
-                            (k) => (
-                              <SelectItem key={k} value={k}>
-                                <span
-                                  className={`inline-block px-2 py-0.5 rounded border text-xs ${STATUS_CLASS[k]}`}
-                                >
-                                  {STATUS_LABEL[k]}
-                                </span>
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={c.flag}
-                        onValueChange={(v) =>
-                          patch(c.id, { flag: v as ContactFlag })
-                        }
-                      >
-                        <SelectTrigger className={`border ${FLAG_CLASS[c.flag]}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(FLAG_LABEL) as ContactFlag[]).map((k) => (
-                            <SelectItem key={k} value={k}>
-                              <span
-                                className={`inline-block px-2 py-0.5 rounded border text-xs ${FLAG_CLASS[k]}`}
-                              >
-                                {FLAG_LABEL[k]}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="date"
-                        value={c.followUpDate}
-                        onChange={(e) =>
-                          patch(c.id, { followUpDate: e.target.value })
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Textarea
-                        value={c.note}
-                        onChange={(e) => patch(c.id, { note: e.target.value })}
-                        rows={2}
-                        maxLength={1000}
-                        className="min-h-[40px]"
-                      />
-                    </TableCell>
-                    {fields.map((f) => {
-                      const val = c.custom[f.id] ?? "";
-                      if (f.type === "dropdown") {
-                        const active = f.options.find((o) => o.id === val);
-                        return (
-                          <TableCell key={f.id}>
-                            <Select
-                              value={val || "__leeg"}
-                              onValueChange={(v) =>
-                                patchCustom(c, f.id, v === "__leeg" ? "" : v)
-                              }
-                            >
-                              <SelectTrigger
-                                className={`border ${
-                                  active ? colorClass(active.color) : "bg-muted text-muted-foreground"
-                                }`}
-                              >
-                                <SelectValue placeholder="Kies…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__leeg">
-                                  <span className="text-xs text-muted-foreground">
-                                    Leeg
-                                  </span>
-                                </SelectItem>
-                                {f.options.map((o) => (
-                                  <SelectItem key={o.id} value={o.id}>
-                                    <span
-                                      className={`inline-block px-2 py-0.5 rounded border text-xs ${colorClass(o.color)}`}
-                                    >
-                                      {o.label}
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        );
-                      }
-                      if (f.type === "longtext") {
-                        return (
-                          <TableCell key={f.id}>
-                            <Textarea
-                              value={val}
-                              onChange={(e) => patchCustom(c, f.id, e.target.value)}
-                              rows={2}
-                              maxLength={5000}
-                              className="min-h-[40px]"
-                            />
-                          </TableCell>
-                        );
-                      }
-                      return (
-                        <TableCell key={f.id}>
-                          <Input
-                            value={val}
-                            onChange={(e) => patchCustom(c, f.id, e.target.value)}
-                            maxLength={255}
-                          />
-                        </TableCell>
-                      );
+                    {orderedCols.map((key) => {
+                      if (key.startsWith("b:"))
+                        return <TableCell key={key}>{builtinCell(c, key)}</TableCell>;
+                      const f = fields.find((x) => `f:${x.id}` === key);
+                      if (!f) return null;
+                      return <TableCell key={key}>{customCell(c, f)}</TableCell>;
                     })}
                     <TableCell>
                       <Button
