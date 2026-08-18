@@ -140,7 +140,7 @@ function contactSortKey(c: Contact): string {
   return c.status;
 }
 
-type SortKey = "name" | "status" | "followUpDate" | `custom:${string}`;
+type SortKey = "name" | "status" | "followUpDate" | "folder" | `custom:${string}`;
 type SortDir = "asc" | "desc";
 
 interface DraftOption {
