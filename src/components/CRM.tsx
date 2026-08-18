@@ -140,6 +140,22 @@ function newOptionId(): string {
   return `opt-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+interface BuiltinCol {
+  key: string;
+  label: string;
+  width: string;
+}
+
+const BUILTIN_COLS: BuiltinCol[] = [
+  { key: "b:name", label: "Naam", width: "min-w-[160px]" },
+  { key: "b:phone", label: "Telefoon", width: "min-w-[140px]" },
+  { key: "b:email", label: "Email", width: "min-w-[180px]" },
+  { key: "b:status", label: "Status", width: "min-w-[190px]" },
+  { key: "b:flag", label: "Markering", width: "min-w-[180px]" },
+  { key: "b:followUpDate", label: "Terugcontact", width: "min-w-[160px]" },
+  { key: "b:note", label: "Notitie", width: "min-w-[220px]" },
+];
+
 export function CRM() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [fields, setFields] = useState<CrmField[]>([]);
@@ -161,6 +177,8 @@ export function CRM() {
     { id: newOptionId(), label: "", color: "sky" },
   ]);
   const [manageOpen, setManageOpen] = useState(false);
+  const [insertIndex, setInsertIndex] = useState(-1);
+  const [columns, setColumns] = useState<string[]>([]);
 
   useEffect(() => {
     listContacts()
@@ -169,6 +187,9 @@ export function CRM() {
     listCrmFields()
       .then(setFields)
       .catch((err) => toast.error("Velden laden mislukt: " + (err as Error).message));
+    getCrmLayout()
+      .then(setColumns)
+      .catch(() => {});
   }, []);
 
   const addContact = async () => {
