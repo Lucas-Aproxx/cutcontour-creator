@@ -679,7 +679,7 @@ export function CRM() {
         ? contacts.filter((c) => !c.folderId).length
         : contacts.filter((c) => c.folderId === key).length;
 
-  const dropZone = (key: string, label: string, icon: React.ReactNode, cls: string) => (
+  const dropZone = (key: string, label: string, icon: ReactNode, cls: string) => (
     <button
       key={key}
       type="button"
