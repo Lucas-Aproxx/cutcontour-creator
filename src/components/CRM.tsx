@@ -169,6 +169,43 @@ const BUILTIN_COLS: BuiltinCol[] = [
   { key: "b:note", label: "Notitie", width: "min-w-[220px]" },
 ];
 
+/** Tekstvak dat automatisch meegroeit met de inhoud. */
+function AutoTextarea({
+  value,
+  onChange,
+  maxLength,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  maxLength?: number;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  useEffect(resize, [value]);
+
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      rows={1}
+      maxLength={maxLength}
+      onChange={(e) => {
+        onChange(e.target.value);
+        resize();
+      }}
+      className="min-h-[40px] resize-none overflow-hidden"
+    />
+  );
+}
+
+
 export function CRM() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [fields, setFields] = useState<CrmField[]>([]);
