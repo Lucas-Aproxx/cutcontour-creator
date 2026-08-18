@@ -304,6 +304,151 @@ export function CRM() {
     }, 500);
   };
 
+  /* ---------- Cel-renderers ---------- */
+
+  const builtinCell = (c: Contact, key: string) => {
+    switch (key) {
+      case "b:name":
+        return (
+          <Input
+            value={c.name}
+            onChange={(e) => patch(c.id, { name: e.target.value })}
+            maxLength={100}
+          />
+        );
+      case "b:phone":
+        return (
+          <Input
+            value={c.phone}
+            onChange={(e) => patch(c.id, { phone: e.target.value })}
+            maxLength={30}
+          />
+        );
+      case "b:email":
+        return (
+          <Input
+            type="email"
+            value={c.email}
+            onChange={(e) => patch(c.id, { email: e.target.value })}
+            maxLength={255}
+          />
+        );
+      case "b:status":
+        return (
+          <Select
+            value={c.status}
+            onValueChange={(v) => patch(c.id, { status: v as ContactStatus })}
+          >
+            <SelectTrigger className={`border ${STATUS_CLASS[c.status]}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(STATUS_LABEL) as ContactStatus[]).map((k) => (
+                <SelectItem key={k} value={k}>
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded border text-xs ${STATUS_CLASS[k]}`}
+                  >
+                    {STATUS_LABEL[k]}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "b:flag":
+        return (
+          <Select value={c.flag} onValueChange={(v) => patch(c.id, { flag: v as ContactFlag })}>
+            <SelectTrigger className={`border ${FLAG_CLASS[c.flag]}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(FLAG_LABEL) as ContactFlag[]).map((k) => (
+                <SelectItem key={k} value={k}>
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded border text-xs ${FLAG_CLASS[k]}`}
+                  >
+                    {FLAG_LABEL[k]}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "b:followUpDate":
+        return (
+          <Input
+            type="date"
+            value={c.followUpDate}
+            onChange={(e) => patch(c.id, { followUpDate: e.target.value })}
+          />
+        );
+      default:
+        return (
+          <Textarea
+            value={c.note}
+            onChange={(e) => patch(c.id, { note: e.target.value })}
+            rows={2}
+            maxLength={1000}
+            className="min-h-[40px]"
+          />
+        );
+    }
+  };
+
+  const customCell = (c: Contact, f: CrmField) => {
+    const val = c.custom[f.id] ?? "";
+    if (f.type === "dropdown") {
+      const active = f.options.find((o) => o.id === val);
+      return (
+        <Select
+          value={val || "__leeg"}
+          onValueChange={(v) => patchCustom(c, f.id, v === "__leeg" ? "" : v)}
+        >
+          <SelectTrigger
+            className={`border ${
+              active ? colorClass(active.color) : "bg-muted text-muted-foreground"
+            }`}
+          >
+            <SelectValue placeholder="Kies…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__leeg">
+              <span className="text-xs text-muted-foreground">Leeg</span>
+            </SelectItem>
+            {f.options.map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                <span
+                  className={`inline-block px-2 py-0.5 rounded border text-xs ${colorClass(o.color)}`}
+                >
+                  {o.label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+    if (f.type === "longtext") {
+      return (
+        <Textarea
+          value={val}
+          onChange={(e) => patchCustom(c, f.id, e.target.value)}
+          rows={2}
+          maxLength={5000}
+          className="min-h-[40px]"
+        />
+      );
+    }
+    return (
+      <Input
+        value={val}
+        onChange={(e) => patchCustom(c, f.id, e.target.value)}
+        maxLength={255}
+      />
+    );
+  };
+
+
   const orderedCols = useMemo(() => {
     const all = [...BUILTIN_COLS.map((b) => b.key), ...fields.map((f) => `f:${f.id}`)];
     const kept = columns.filter((k) => all.includes(k));
