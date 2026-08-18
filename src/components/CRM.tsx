@@ -494,14 +494,13 @@ export function CRM() {
         );
       default:
         return (
-          <Textarea
+          <AutoTextarea
             value={c.note}
-            onChange={(e) => patch(c.id, { note: e.target.value })}
-            rows={2}
+            onChange={(v) => patch(c.id, { note: v })}
             maxLength={1000}
-            className="min-h-[40px]"
           />
         );
+
     }
   };
 
