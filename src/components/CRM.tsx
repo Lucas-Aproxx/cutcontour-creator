@@ -1303,6 +1303,145 @@ export function CRM() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Nieuwe map */}
+      <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nieuwe map</DialogTitle>
+            <DialogDescription>
+              Geef de map een naam en kleur, bv. “Bellen vandaag” of “Later contacteren”.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="fol-name">Naam</Label>
+              <Input
+                id="fol-name"
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                placeholder="bv. Bellen vandaag"
+                maxLength={60}
+              />
+            </div>
+            <div>
+              <Label>Kleur</Label>
+              <Select value={folderColor} onValueChange={setFolderColor}>
+                <SelectTrigger className={`border ${colorClass(folderColor)}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COLORS.map((c) => (
+                    <SelectItem key={c.key} value={c.key}>
+                      <span className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+                        {c.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFolderOpen(false)}>
+              Annuleren
+            </Button>
+            <Button onClick={saveNewFolder}>Map opslaan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mappen beheren */}
+      <Dialog open={manageFoldersOpen} onOpenChange={setManageFoldersOpen}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Mappen beheren</DialogTitle>
+            <DialogDescription>
+              Hernoem mappen, geef ze een andere kleur of zet ze in een andere volgorde.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {folders.map((f, idx) => (
+              <div key={f.id} className="flex items-center gap-2 rounded-lg border p-2">
+                <span className="text-xs text-muted-foreground w-6 text-right">{idx + 1}</span>
+                <Input
+                  value={f.name}
+                  onChange={(e) => patchFolder(f.id, { name: e.target.value })}
+                  maxLength={60}
+                />
+                <Select value={f.color} onValueChange={(v) => patchFolder(f.id, { color: v })}>
+                  <SelectTrigger className={`w-[130px] border ${colorClass(f.color)}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COLORS.map((c) => (
+                      <SelectItem key={c.key} value={c.key}>
+                        <span className="flex items-center gap-2">
+                          <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+                          {c.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Naar boven"
+                  disabled={idx === 0}
+                  onClick={() => moveFolder(f.id, -1)}
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Naar onder"
+                  disabled={idx === folders.length - 1}
+                  onClick={() => moveFolder(f.id, 1)}
+                >
+                  <ArrowDown className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Map verwijderen"
+                  onClick={() => setDeleteFolderId(f.id)}
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setManageFoldersOpen(false)}>Sluiten</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteFolderId} onOpenChange={(o) => !o && setDeleteFolderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Map verwijderen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteFolderTarget
+                ? `De map "${deleteFolderTarget.name}" wordt verwijderd. De contacten blijven bestaan en komen bij “Zonder map”.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteFolderId && removeFolder(deleteFolderId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Verwijderen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
   );
 }
