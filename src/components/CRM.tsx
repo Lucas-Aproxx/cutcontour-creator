@@ -169,6 +169,43 @@ const BUILTIN_COLS: BuiltinCol[] = [
   { key: "b:note", label: "Notitie", width: "min-w-[220px]" },
 ];
 
+/** Tekstvak dat automatisch meegroeit met de inhoud. */
+function AutoTextarea({
+  value,
+  onChange,
+  maxLength,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  maxLength?: number;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  useEffect(resize, [value]);
+
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      rows={1}
+      maxLength={maxLength}
+      onChange={(e) => {
+        onChange(e.target.value);
+        resize();
+      }}
+      className="min-h-[40px] resize-none overflow-hidden"
+    />
+  );
+}
+
+
 export function CRM() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [fields, setFields] = useState<CrmField[]>([]);
@@ -494,14 +531,13 @@ export function CRM() {
         );
       default:
         return (
-          <Textarea
+          <AutoTextarea
             value={c.note}
-            onChange={(e) => patch(c.id, { note: e.target.value })}
-            rows={2}
+            onChange={(v) => patch(c.id, { note: v })}
             maxLength={1000}
-            className="min-h-[40px]"
           />
         );
+
     }
   };
 
@@ -540,13 +576,12 @@ export function CRM() {
     }
     if (f.type === "longtext") {
       return (
-        <Textarea
+        <AutoTextarea
           value={val}
-          onChange={(e) => patchCustom(c, f.id, e.target.value)}
-          rows={2}
+          onChange={(v) => patchCustom(c, f.id, v)}
           maxLength={5000}
-          className="min-h-[40px]"
         />
+
       );
     }
     return (
