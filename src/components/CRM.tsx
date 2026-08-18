@@ -57,6 +57,8 @@ import {
   createCrmField,
   updateCrmField,
   deleteCrmField,
+  getCrmLayout,
+  saveCrmLayout,
   type Contact,
   type ContactStatus,
   type ContactFlag,
@@ -140,6 +142,22 @@ function newOptionId(): string {
   return `opt-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+interface BuiltinCol {
+  key: string;
+  label: string;
+  width: string;
+}
+
+const BUILTIN_COLS: BuiltinCol[] = [
+  { key: "b:name", label: "Naam", width: "min-w-[160px]" },
+  { key: "b:phone", label: "Telefoon", width: "min-w-[140px]" },
+  { key: "b:email", label: "Email", width: "min-w-[180px]" },
+  { key: "b:status", label: "Status", width: "min-w-[190px]" },
+  { key: "b:flag", label: "Markering", width: "min-w-[180px]" },
+  { key: "b:followUpDate", label: "Terugcontact", width: "min-w-[160px]" },
+  { key: "b:note", label: "Notitie", width: "min-w-[220px]" },
+];
+
 export function CRM() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [fields, setFields] = useState<CrmField[]>([]);
@@ -161,6 +179,8 @@ export function CRM() {
     { id: newOptionId(), label: "", color: "sky" },
   ]);
   const [manageOpen, setManageOpen] = useState(false);
+  const [insertIndex, setInsertIndex] = useState(-1);
+  const [columns, setColumns] = useState<string[]>([]);
 
   useEffect(() => {
     listContacts()
@@ -169,6 +189,9 @@ export function CRM() {
     listCrmFields()
       .then(setFields)
       .catch((err) => toast.error("Velden laden mislukt: " + (err as Error).message));
+    getCrmLayout()
+      .then(setColumns)
+      .catch(() => {});
   }, []);
 
   const addContact = async () => {
@@ -251,7 +274,12 @@ export function CRM() {
         options,
         position: fields.length,
       });
+      const key = `f:${created.id}`;
+      const base = orderedCols.filter((k) => k !== key);
+      const at = insertIndex < 0 || insertIndex > base.length ? base.length : insertIndex;
+      const nextCols = [...base.slice(0, at), key, ...base.slice(at)];
       setFields((prev) => [...prev, created]);
+      void persistColumns(nextCols);
       setAddOpen(false);
       resetFieldForm();
       toast.success("Veld toegevoegd");
@@ -264,7 +292,7 @@ export function CRM() {
 
   const patchField = (
     id: string,
-    p: Partial<Pick<CrmField, "name" | "options" | "position">>,
+    p: Partial<Pick<CrmField, "name" | "options" | "position" | "type">>,
   ) => {
     setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...p } : f)));
     const existing = fieldTimers.current[id];
@@ -276,22 +304,182 @@ export function CRM() {
     }, 500);
   };
 
-  const moveField = async (id: string, dir: -1 | 1) => {
-    const idx = fields.findIndex((f) => f.id === id);
-    const target = idx + dir;
-    if (idx < 0 || target < 0 || target >= fields.length) return;
-    const next = [...fields];
-    const [item] = next.splice(idx, 1);
-    next.splice(target, 0, item);
-    const withPos = next.map((f, i) => ({ ...f, position: i }));
-    setFields(withPos);
-    try {
-      await Promise.all(
-        withPos.map((f) => updateCrmField(f.id, { position: f.position })),
+  /* ---------- Cel-renderers ---------- */
+
+  const builtinCell = (c: Contact, key: string) => {
+    switch (key) {
+      case "b:name":
+        return (
+          <Input
+            value={c.name}
+            onChange={(e) => patch(c.id, { name: e.target.value })}
+            maxLength={100}
+          />
+        );
+      case "b:phone":
+        return (
+          <Input
+            value={c.phone}
+            onChange={(e) => patch(c.id, { phone: e.target.value })}
+            maxLength={30}
+          />
+        );
+      case "b:email":
+        return (
+          <Input
+            type="email"
+            value={c.email}
+            onChange={(e) => patch(c.id, { email: e.target.value })}
+            maxLength={255}
+          />
+        );
+      case "b:status":
+        return (
+          <Select
+            value={c.status}
+            onValueChange={(v) => patch(c.id, { status: v as ContactStatus })}
+          >
+            <SelectTrigger className={`border ${STATUS_CLASS[c.status]}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(STATUS_LABEL) as ContactStatus[]).map((k) => (
+                <SelectItem key={k} value={k}>
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded border text-xs ${STATUS_CLASS[k]}`}
+                  >
+                    {STATUS_LABEL[k]}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "b:flag":
+        return (
+          <Select value={c.flag} onValueChange={(v) => patch(c.id, { flag: v as ContactFlag })}>
+            <SelectTrigger className={`border ${FLAG_CLASS[c.flag]}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(FLAG_LABEL) as ContactFlag[]).map((k) => (
+                <SelectItem key={k} value={k}>
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded border text-xs ${FLAG_CLASS[k]}`}
+                  >
+                    {FLAG_LABEL[k]}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "b:followUpDate":
+        return (
+          <Input
+            type="date"
+            value={c.followUpDate}
+            onChange={(e) => patch(c.id, { followUpDate: e.target.value })}
+          />
+        );
+      default:
+        return (
+          <Textarea
+            value={c.note}
+            onChange={(e) => patch(c.id, { note: e.target.value })}
+            rows={2}
+            maxLength={1000}
+            className="min-h-[40px]"
+          />
+        );
+    }
+  };
+
+  const customCell = (c: Contact, f: CrmField) => {
+    const val = c.custom[f.id] ?? "";
+    if (f.type === "dropdown") {
+      const active = f.options.find((o) => o.id === val);
+      return (
+        <Select
+          value={val || "__leeg"}
+          onValueChange={(v) => patchCustom(c, f.id, v === "__leeg" ? "" : v)}
+        >
+          <SelectTrigger
+            className={`border ${
+              active ? colorClass(active.color) : "bg-muted text-muted-foreground"
+            }`}
+          >
+            <SelectValue placeholder="Kies…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__leeg">
+              <span className="text-xs text-muted-foreground">Leeg</span>
+            </SelectItem>
+            {f.options.map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                <span
+                  className={`inline-block px-2 py-0.5 rounded border text-xs ${colorClass(o.color)}`}
+                >
+                  {o.label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       );
+    }
+    if (f.type === "longtext") {
+      return (
+        <Textarea
+          value={val}
+          onChange={(e) => patchCustom(c, f.id, e.target.value)}
+          rows={2}
+          maxLength={5000}
+          className="min-h-[40px]"
+        />
+      );
+    }
+    return (
+      <Input
+        value={val}
+        onChange={(e) => patchCustom(c, f.id, e.target.value)}
+        maxLength={255}
+      />
+    );
+  };
+
+
+  const orderedCols = useMemo(() => {
+    const all = [...BUILTIN_COLS.map((b) => b.key), ...fields.map((f) => `f:${f.id}`)];
+    const kept = columns.filter((k) => all.includes(k));
+    const missing = all.filter((k) => !kept.includes(k));
+    return [...kept, ...missing];
+  }, [columns, fields]);
+
+  const persistColumns = async (next: string[]) => {
+    setColumns(next);
+    try {
+      await saveCrmLayout(next);
     } catch (err) {
       toast.error("Volgorde opslaan mislukt: " + (err as Error).message);
     }
+  };
+
+  const moveColumn = (key: string, dir: -1 | 1) => {
+    const idx = orderedCols.indexOf(key);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= orderedCols.length) return;
+    const next = [...orderedCols];
+    const [item] = next.splice(idx, 1);
+    next.splice(target, 0, item);
+    void persistColumns(next);
+  };
+
+  const colLabel = (key: string): string => {
+    const b = BUILTIN_COLS.find((x) => x.key === key);
+    if (b) return b.label;
+    const f = fields.find((x) => `f:${x.id}` === key);
+    return f?.name || "Veld";
   };
 
   const removeField = async (id: string) => {
@@ -419,14 +607,9 @@ export function CRM() {
               <Plus className="w-4 h-4 mr-1" />
               Veld toevoegen
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setManageOpen(true)}
-              disabled={fields.length === 0}
-            >
+            <Button size="sm" variant="outline" onClick={() => setManageOpen(true)}>
               <Settings2 className="w-4 h-4 mr-1" />
-              Velden beheren
+              Kolommen beheren
             </Button>
           </div>
         </div>
@@ -475,178 +658,37 @@ export function CRM() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[160px]">Naam</TableHead>
-                  <TableHead className="min-w-[140px]">Telefoon</TableHead>
-                  <TableHead className="min-w-[180px]">Email</TableHead>
-                  <TableHead className="min-w-[190px]">Status</TableHead>
-                  <TableHead className="min-w-[180px]">Markering</TableHead>
-                  <TableHead className="min-w-[160px]">Terugcontact</TableHead>
-                  <TableHead className="min-w-[220px]">Notitie</TableHead>
-                  {fields.map((f) => (
-                    <TableHead
-                      key={f.id}
-                      className={f.type === "longtext" ? "min-w-[220px]" : "min-w-[170px]"}
-                    >
-                      {f.name || "Veld"}
-                    </TableHead>
-                  ))}
+                  {orderedCols.map((key) => {
+                    const b = BUILTIN_COLS.find((x) => x.key === key);
+                    if (b)
+                      return (
+                        <TableHead key={key} className={b.width}>
+                          {b.label}
+                        </TableHead>
+                      );
+                    const f = fields.find((x) => `f:${x.id}` === key);
+                    if (!f) return null;
+                    return (
+                      <TableHead
+                        key={key}
+                        className={f.type === "longtext" ? "min-w-[220px]" : "min-w-[170px]"}
+                      >
+                        {f.name || "Veld"}
+                      </TableHead>
+                    );
+                  })}
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sorted.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell>
-                      <Input
-                        value={c.name}
-                        onChange={(e) => patch(c.id, { name: e.target.value })}
-                        maxLength={100}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={c.phone}
-                        onChange={(e) => patch(c.id, { phone: e.target.value })}
-                        maxLength={30}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="email"
-                        value={c.email}
-                        onChange={(e) => patch(c.id, { email: e.target.value })}
-                        maxLength={255}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={c.status}
-                        onValueChange={(v) =>
-                          patch(c.id, { status: v as ContactStatus })
-                        }
-                      >
-                        <SelectTrigger
-                          className={`border ${STATUS_CLASS[c.status]}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(STATUS_LABEL) as ContactStatus[]).map(
-                            (k) => (
-                              <SelectItem key={k} value={k}>
-                                <span
-                                  className={`inline-block px-2 py-0.5 rounded border text-xs ${STATUS_CLASS[k]}`}
-                                >
-                                  {STATUS_LABEL[k]}
-                                </span>
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={c.flag}
-                        onValueChange={(v) =>
-                          patch(c.id, { flag: v as ContactFlag })
-                        }
-                      >
-                        <SelectTrigger className={`border ${FLAG_CLASS[c.flag]}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(FLAG_LABEL) as ContactFlag[]).map((k) => (
-                            <SelectItem key={k} value={k}>
-                              <span
-                                className={`inline-block px-2 py-0.5 rounded border text-xs ${FLAG_CLASS[k]}`}
-                              >
-                                {FLAG_LABEL[k]}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="date"
-                        value={c.followUpDate}
-                        onChange={(e) =>
-                          patch(c.id, { followUpDate: e.target.value })
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Textarea
-                        value={c.note}
-                        onChange={(e) => patch(c.id, { note: e.target.value })}
-                        rows={2}
-                        maxLength={1000}
-                        className="min-h-[40px]"
-                      />
-                    </TableCell>
-                    {fields.map((f) => {
-                      const val = c.custom[f.id] ?? "";
-                      if (f.type === "dropdown") {
-                        const active = f.options.find((o) => o.id === val);
-                        return (
-                          <TableCell key={f.id}>
-                            <Select
-                              value={val || "__leeg"}
-                              onValueChange={(v) =>
-                                patchCustom(c, f.id, v === "__leeg" ? "" : v)
-                              }
-                            >
-                              <SelectTrigger
-                                className={`border ${
-                                  active ? colorClass(active.color) : "bg-muted text-muted-foreground"
-                                }`}
-                              >
-                                <SelectValue placeholder="Kies…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__leeg">
-                                  <span className="text-xs text-muted-foreground">
-                                    Leeg
-                                  </span>
-                                </SelectItem>
-                                {f.options.map((o) => (
-                                  <SelectItem key={o.id} value={o.id}>
-                                    <span
-                                      className={`inline-block px-2 py-0.5 rounded border text-xs ${colorClass(o.color)}`}
-                                    >
-                                      {o.label}
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        );
-                      }
-                      if (f.type === "longtext") {
-                        return (
-                          <TableCell key={f.id}>
-                            <Textarea
-                              value={val}
-                              onChange={(e) => patchCustom(c, f.id, e.target.value)}
-                              rows={2}
-                              maxLength={5000}
-                              className="min-h-[40px]"
-                            />
-                          </TableCell>
-                        );
-                      }
-                      return (
-                        <TableCell key={f.id}>
-                          <Input
-                            value={val}
-                            onChange={(e) => patchCustom(c, f.id, e.target.value)}
-                            maxLength={255}
-                          />
-                        </TableCell>
-                      );
+                    {orderedCols.map((key) => {
+                      if (key.startsWith("b:"))
+                        return <TableCell key={key}>{builtinCell(c, key)}</TableCell>;
+                      const f = fields.find((x) => `f:${x.id}` === key);
+                      if (!f) return null;
+                      return <TableCell key={key}>{customCell(c, f)}</TableCell>;
                     })}
                     <TableCell>
                       <Button
@@ -775,6 +817,27 @@ export function CRM() {
                 </Button>
               </div>
             )}
+
+            <div>
+              <Label>Plaats in de tabel</Label>
+              <Select
+                value={String(insertIndex)}
+                onValueChange={(v) => setInsertIndex(Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="-1">Helemaal achteraan</SelectItem>
+                  <SelectItem value="0">Helemaal vooraan</SelectItem>
+                  {orderedCols.map((k, i) => (
+                    <SelectItem key={k} value={String(i + 1)}>
+                      Na “{colLabel(k)}”
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>
@@ -785,116 +848,149 @@ export function CRM() {
         </DialogContent>
       </Dialog>
 
-      {/* Velden beheren */}
+      {/* Kolommen beheren */}
       <Dialog open={manageOpen} onOpenChange={setManageOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Velden beheren</DialogTitle>
+            <DialogTitle>Kolommen beheren</DialogTitle>
             <DialogDescription>
-              Wijzig namen, kleuren, opties en de volgorde van je eigen velden.
+              Zet elke kolom — ook de standaardkolommen — met de pijltjes op de plaats
+              die je wil. Eigen velden kan je hier ook hernoemen en aanpassen.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            {fields.map((f, idx) => (
-              <div key={f.id} className="rounded-lg border p-3 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={f.name}
-                    onChange={(e) => patchField(f.id, { name: e.target.value })}
-                    maxLength={60}
-                  />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {FIELD_TYPE_LABEL[f.type]}
-                  </span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Omhoog"
-                    disabled={idx === 0}
-                    onClick={() => moveField(f.id, -1)}
-                  >
-                    <ArrowUp className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Omlaag"
-                    disabled={idx === fields.length - 1}
-                    onClick={() => moveField(f.id, 1)}
-                  >
-                    <ArrowDown className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Veld verwijderen"
-                    onClick={() => setDeleteFieldId(f.id)}
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-
-                {f.type === "dropdown" && (
-                  <div className="space-y-2">
-                    {f.options.map((o, oi) => (
-                      <div key={o.id} className="flex items-center gap-2">
-                        <Input
-                          value={o.label}
-                          onChange={(e) =>
-                            patchField(f.id, {
-                              options: f.options.map((p, pi) =>
-                                pi === oi ? { ...p, label: e.target.value } : p,
-                              ),
-                            })
-                          }
-                          maxLength={60}
-                        />
-                        <Select
-                          value={o.color}
-                          onValueChange={(v) =>
-                            patchField(f.id, {
-                              options: f.options.map((p, pi) =>
-                                pi === oi ? { ...p, color: v } : p,
-                              ),
-                            })
-                          }
-                        >
-                          <SelectTrigger className={`w-[130px] border ${colorClass(o.color)}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {COLORS.map((c) => (
-                              <SelectItem key={c.key} value={c.key}>
-                                <span className="flex items-center gap-2">
-                                  <span className={`w-3 h-3 rounded-full ${c.dot}`} />
-                                  {c.label}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label="Optie verwijderen"
-                          onClick={() =>
-                            patchField(f.id, {
-                              options: f.options.filter((_, pi) => pi !== oi),
-                            })
-                          }
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button size="sm" variant="outline" onClick={() => addOptionTo(f)}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Optie toevoegen
+          <div className="space-y-3">
+            {orderedCols.map((key, idx) => {
+              const builtin = BUILTIN_COLS.find((x) => x.key === key);
+              const f = builtin ? null : fields.find((x) => `f:${x.id}` === key) ?? null;
+              if (!builtin && !f) return null;
+              return (
+                <div key={key} className="rounded-lg border p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-6 text-right">
+                      {idx + 1}
+                    </span>
+                    {builtin ? (
+                      <span className="flex-1 text-sm font-medium">{builtin.label}</span>
+                    ) : (
+                      <Input
+                        value={f!.name}
+                        onChange={(e) => patchField(f!.id, { name: e.target.value })}
+                        maxLength={60}
+                      />
+                    )}
+                    {builtin ? (
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        Standaard
+                      </span>
+                    ) : (
+                      <Select
+                        value={f!.type}
+                        onValueChange={(v) => patchField(f!.id, { type: v as CrmFieldType })}
+                      >
+                        <SelectTrigger className="w-[150px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(FIELD_TYPE_LABEL) as CrmFieldType[]).map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {FIELD_TYPE_LABEL[t]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Naar links"
+                      disabled={idx === 0}
+                      onClick={() => moveColumn(key, -1)}
+                    >
+                      <ArrowUp className="w-4 h-4" />
                     </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Naar rechts"
+                      disabled={idx === orderedCols.length - 1}
+                      onClick={() => moveColumn(key, 1)}
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                    </Button>
+                    {f && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Veld verwijderen"
+                        onClick={() => setDeleteFieldId(f.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {f && f.type === "dropdown" && (
+                    <div className="space-y-2">
+                      {f.options.map((o, oi) => (
+                        <div key={o.id} className="flex items-center gap-2">
+                          <Input
+                            value={o.label}
+                            onChange={(e) =>
+                              patchField(f.id, {
+                                options: f.options.map((p, pi) =>
+                                  pi === oi ? { ...p, label: e.target.value } : p,
+                                ),
+                              })
+                            }
+                            maxLength={60}
+                          />
+                          <Select
+                            value={o.color}
+                            onValueChange={(v) =>
+                              patchField(f.id, {
+                                options: f.options.map((p, pi) =>
+                                  pi === oi ? { ...p, color: v } : p,
+                                ),
+                              })
+                            }
+                          >
+                            <SelectTrigger className={`w-[130px] border ${colorClass(o.color)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {COLORS.map((c) => (
+                                <SelectItem key={c.key} value={c.key}>
+                                  <span className="flex items-center gap-2">
+                                    <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+                                    {c.label}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Optie verwijderen"
+                            onClick={() =>
+                              patchField(f.id, {
+                                options: f.options.filter((_, pi) => pi !== oi),
+                              })
+                            }
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button size="sm" variant="outline" onClick={() => addOptionTo(f)}>
+                        <Plus className="w-4 h-4 mr-1" />
+                        Optie toevoegen
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <DialogFooter>
             <Button onClick={() => setManageOpen(false)}>Sluiten</Button>

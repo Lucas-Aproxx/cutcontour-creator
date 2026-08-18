@@ -92,6 +92,27 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_layout: {
+        Row: {
+          columns: Json
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          columns?: Json
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          columns?: Json
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       presets: {
         Row: {
           created_at: string

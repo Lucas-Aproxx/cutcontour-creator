@@ -227,12 +227,13 @@ export async function createCrmField(input: {
 
 export async function updateCrmField(
   id: string,
-  patch: Partial<Pick<CrmField, "name" | "options" | "position">>,
+  patch: Partial<Pick<CrmField, "name" | "options" | "position" | "type">>,
 ): Promise<void> {
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.options !== undefined) row.options = patch.options;
   if (patch.position !== undefined) row.position = patch.position;
+  if (patch.type !== undefined) row.type = patch.type;
   if (Object.keys(row).length === 0) return;
   const { error } = await (supabase as any).from("crm_fields").update(row).eq("id", id);
   if (error) throw error;
@@ -240,6 +241,26 @@ export async function updateCrmField(
 
 export async function deleteCrmField(id: string): Promise<void> {
   const { error } = await (supabase as any).from("crm_fields").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/* ---------------- CRM kolomvolgorde (inclusief standaardkolommen) ---------------- */
+
+export async function getCrmLayout(): Promise<string[]> {
+  const { data, error } = await (supabase as any)
+    .from("crm_layout")
+    .select("columns")
+    .maybeSingle();
+  if (error) throw error;
+  const raw = data?.columns;
+  return Array.isArray(raw) ? raw.map((v: unknown) => String(v)) : [];
+}
+
+export async function saveCrmLayout(columns: string[]): Promise<void> {
+  const userId = await requireUserId();
+  const { error } = await (supabase as any)
+    .from("crm_layout")
+    .upsert({ user_id: userId, columns }, { onConflict: "user_id" });
   if (error) throw error;
 }
 
