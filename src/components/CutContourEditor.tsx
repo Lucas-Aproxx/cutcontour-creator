@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addCutContour, type CutShape, type ShapeType } from "@/lib/cutcontour";
+import { addCutContour, PUBLI_FDM_CUT_COLOR, type CutColor, type CutShape, type ShapeType } from "@/lib/cutcontour";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { PDFDocument } from "pdf-lib";
@@ -21,6 +22,19 @@ interface PageDims {
 }
 
 const PT_PER_MM = 72 / 25.4;
+
+/**
+ * Steunkleuren voor de snijlijn. Publi-FDM schrijft voor: een aparte laag
+ * "Cutcontour" met de snijlijn in 100% magenta (CMYK 0/100/0/0).
+ */
+const CUT_COLORS: Array<CutColor & { label: string; preview: string; note?: string }> = [
+  { ...PUBLI_FDM_CUT_COLOR, label: "Magenta 100% — Publi-FDM norm", preview: "#e6007e", note: "Aanbevolen: dit is de standaard volgens Publi-FDM (laag \"Cutcontour\", CMYK 0/100/0/0)." },
+  { name: "Cutcontour", cmyk: [1, 0, 0, 0], label: "Cyaan 100%", preview: "#00a0e3" },
+  { name: "Cutcontour", cmyk: [0, 0, 1, 0], label: "Geel 100%", preview: "#ffed00" },
+  { name: "Cutcontour", cmyk: [0, 0, 0, 1], label: "Zwart 100%", preview: "#1a1a1a" },
+  { name: "Cutcontour", cmyk: [1, 0, 1, 0], label: "Groen (C100 Y100)", preview: "#00a651" },
+  { name: "Cutcontour", cmyk: [0, 1, 1, 0], label: "Rood (M100 Y100)", preview: "#e2231a" },
+];
 
 function MmInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
   const [draft, setDraft] = useState<string>(Number(value.toFixed(2)).toString());
@@ -81,6 +95,8 @@ export function CutContourEditor() {
     await new Promise((r) => requestAnimationFrame(() => r(null)));
   };
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [colorIdx, setColorIdx] = useState(0);
+  const cutColor = CUT_COLORS[colorIdx] ?? CUT_COLORS[0];
   const [presets, setPresets] = useState<Preset[]>([]);
   const [newPresetName, setNewPresetName] = useState("");
 
@@ -219,7 +235,7 @@ export function CutContourEditor() {
       await step(10, "PDF inlezen…");
       const source = fileBytes.slice(0);
       await step(35, `Cutcontour-laag opbouwen (${shapes.length} contouren)…`);
-      const bytes = await addCutContour(source, shapes);
+      const bytes = await addCutContour(source, shapes, { name: cutColor.name, cmyk: cutColor.cmyk });
       await step(75, "CMYK-drukprofiel toevoegen…");
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       await step(90, "Download klaarzetten…");
@@ -282,7 +298,7 @@ export function CutContourEditor() {
           const isEllipse = s.type === "ellipse";
 
           // shape outline
-          ctx.strokeStyle = "#e11d48";
+          ctx.strokeStyle = cutColor.preview;
           ctx.beginPath();
           if (isEllipse) {
             ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
@@ -328,14 +344,14 @@ export function CutContourEditor() {
           if (by + boxH > canvas.height) by = Math.max(0, canvas.height - boxH);
 
           ctx.fillStyle = "rgba(255,255,255,0.92)";
-          ctx.strokeStyle = "#e11d48";
+          ctx.strokeStyle = cutColor.preview;
           ctx.lineWidth = 1;
           ctx.fillRect(bx, by, boxW, boxH);
           ctx.strokeRect(bx, by, boxW, boxH);
           ctx.lineWidth = 2;
 
           // leader line to reference point
-          ctx.strokeStyle = "#e11d48";
+          ctx.strokeStyle = cutColor.preview;
           ctx.setLineDash([4 * SCALE, 3 * SCALE]);
           ctx.beginPath();
           ctx.moveTo(bx, by + boxH / 2);
@@ -771,6 +787,32 @@ export function CutContourEditor() {
         </section>
 
         <aside className="space-y-4">
+          <Card className="p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-primary" />
+              <h2 className="font-semibold">Contourkleur</h2>
+            </div>
+            <Select value={String(colorIdx)} onValueChange={(v) => setColorIdx(Number(v))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CUT_COLORS.map((c, i) => (
+                  <SelectItem key={c.label} value={String(i)}>
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block w-3 h-3 rounded-full border" style={{ background: c.preview }} />
+                      {c.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {cutColor.note ??
+                `De snijlijn komt in de aparte laag "Cutcontour" als steunkleur CMYK ${cutColor.cmyk.map((v) => Math.round(v * 100)).join("/")}. Publi-FDM verwacht 100% magenta (0/100/0/0).`}
+            </p>
+          </Card>
+
           {selected && (
             <Card className="p-4 space-y-3">
               <div className="flex items-center gap-2">
