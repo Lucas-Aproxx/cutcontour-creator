@@ -51,6 +51,8 @@ import {
   GripVertical,
   Inbox,
   Users,
+  Search,
+  Download,
 } from "lucide-react";
 
 import {
@@ -220,6 +222,7 @@ export function CRM() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteFieldId, setDeleteFieldId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   // New contact form
   const [nName, setNName] = useState("");
@@ -727,10 +730,41 @@ export function CRM() {
   /* ---------- Sorting ---------- */
 
   const visible = useMemo(() => {
-    if (activeFolder === "all") return contacts;
-    if (activeFolder === "none") return contacts.filter((c) => !c.folderId);
-    return contacts.filter((c) => c.folderId === activeFolder);
-  }, [contacts, activeFolder]);
+    const base =
+      activeFolder === "all"
+        ? contacts
+        : activeFolder === "none"
+          ? contacts.filter((c) => !c.folderId)
+          : contacts.filter((c) => c.folderId === activeFolder);
+    const q = query.trim().toLowerCase();
+    if (!q) return base;
+    const terms = q.split(/\s+/);
+    return base.filter((c) => {
+      const customText = fields
+        .map((f) => {
+          const v = c.custom[f.id] ?? "";
+          if (!v) return "";
+          if (f.type === "dropdown") return f.options.find((o) => o.id === v)?.label ?? "";
+          return v;
+        })
+        .join(" ");
+      const hay = [
+        c.name,
+        c.phone,
+        c.email,
+        c.note,
+        c.followUpDate,
+        STATUS_LABEL[c.status] ?? "",
+        FLAG_LABEL[c.flag] ?? "",
+        folders.find((f) => f.id === c.folderId)?.name ?? "",
+        customText,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    });
+  }, [contacts, activeFolder, query, fields, folders]);
+
 
   const sorted = useMemo(() => {
     const arr = [...visible];
@@ -789,6 +823,55 @@ export function CRM() {
       setSortDir("asc");
     }
   };
+
+  const exportVisibleCsv = () => {
+    const esc = (v: string) => (/[;\n"]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const folderName = (id: string) => folders.find((f) => f.id === id)?.name ?? "";
+    const header = [
+      "Naam",
+      "Telefoon",
+      "Email",
+      "Status",
+      "Markering",
+      "Terugcontact",
+      "Map",
+      "Notitie",
+      ...fields.map((f) => f.name || "Veld"),
+    ];
+    const rows = sorted.map((c) => [
+      c.name,
+      c.phone,
+      c.email,
+      STATUS_LABEL[c.status] ?? "",
+      FLAG_LABEL[c.flag] ?? "",
+      c.followUpDate || "",
+      folderName(c.folderId),
+      c.note,
+      ...fields.map((f) => {
+        const v = c.custom[f.id] ?? "";
+        if (!v) return "";
+        return f.type === "dropdown" ? (f.options.find((o) => o.id === v)?.label ?? "") : v;
+      }),
+    ]);
+    const csv =
+      "\uFEFF" +
+      [header, ...rows].map((r) => r.map((v) => esc(String(v ?? ""))).join(";")).join("\n");
+    const label =
+      activeFolder === "all"
+        ? "alle-contacten"
+        : activeFolder === "none"
+          ? "zonder-map"
+          : (folders.find((f) => f.id === activeFolder)?.name || "map");
+    const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `crm-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${rows.length} contact(en) geëxporteerd`);
+  };
+
 
   const deleteTarget = contacts.find((c) => c.id === deleteId) || null;
   const deleteFieldTarget = fields.find((f) => f.id === deleteFieldId) || null;
@@ -923,6 +1006,15 @@ export function CRM() {
               <Settings2 className="w-4 h-4 mr-1" />
               Kolommen beheren
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={exportVisibleCsv}
+              disabled={sorted.length === 0}
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Exporteer (CSV)
+            </Button>
             <span className="text-xs text-muted-foreground min-w-[110px]">
               {fieldSaving > 0
                 ? "Velden opslaan…"
@@ -932,6 +1024,28 @@ export function CRM() {
             </span>
           </div>
         </div>
+
+        <div className="mb-3 relative max-w-md">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Zoek op naam, telefoon, email, notitie…"
+            className="pl-9 pr-9"
+            aria-label="Zoek contacten"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Zoekopdracht wissen"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
 
 
         <div className="flex items-center gap-2 text-sm flex-wrap mb-3">
@@ -979,7 +1093,9 @@ export function CRM() {
 
         {sorted.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
-            Nog geen contacten. Voeg er hierboven één toe.
+            {query.trim()
+              ? `Geen resultaten voor “${query.trim()}”.`
+              : "Nog geen contacten. Voeg er hierboven één toe."}
           </p>
         ) : (
           <div className="-mx-4 overflow-x-auto px-4">
