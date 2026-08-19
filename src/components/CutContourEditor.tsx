@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addCutContour, PUBLI_FDM_CUT_COLOR, type CutShape, type ShapeType } from "@/lib/cutcontour";
+import { addCutContour, type CutShape, type ShapeType } from "@/lib/cutcontour";
 import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { PDFDocument } from "pdf-lib";
