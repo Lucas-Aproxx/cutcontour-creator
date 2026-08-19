@@ -754,8 +754,8 @@ export function CRM() {
         c.email,
         c.note,
         c.followUpDate,
-        statusLabel(c.status),
-        flagLabel(c.flag),
+        STATUS_LABEL[c.status] ?? "",
+        FLAG_LABEL[c.flag] ?? "",
         folders.find((f) => f.id === c.folderId)?.name ?? "",
         customText,
       ]
