@@ -815,7 +815,7 @@ export function CRM() {
     <div className="space-y-4">
       <Card className="p-4">
         <h2 className="text-lg font-semibold mb-3">Nieuw contact</h2>
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto]">
           <div>
             <Label htmlFor="crm-name">Naam</Label>
             <Input
@@ -847,7 +847,7 @@ export function CRM() {
               maxLength={255}
             />
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end sm:col-span-2 xl:col-span-1">
             <Button onClick={addContact} className="w-full md:w-auto">
               <Plus className="w-4 h-4 mr-1" />
               Toevoegen
@@ -958,8 +958,8 @@ export function CRM() {
             Nog geen contacten. Voeg er hierboven één toe.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="-mx-4 overflow-x-auto px-4">
+            <Table className="w-full table-auto">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[36px]"></TableHead>
@@ -976,7 +976,7 @@ export function CRM() {
                     return (
                       <TableHead
                         key={key}
-                        className={f.type === "longtext" ? "min-w-[220px]" : "min-w-[170px]"}
+                        className={f.type === "longtext" ? "min-w-[260px] w-[20%]" : "min-w-[170px]"}
                       >
                         {f.name || "Veld"}
                       </TableHead>
@@ -1007,10 +1007,18 @@ export function CRM() {
                     </TableCell>
                     {orderedCols.map((key) => {
                       if (key.startsWith("b:"))
-                        return <TableCell key={key}>{builtinCell(c, key)}</TableCell>;
+                        return (
+                          <TableCell key={key} className="align-top">
+                            {builtinCell(c, key)}
+                          </TableCell>
+                        );
                       const f = fields.find((x) => `f:${x.id}` === key);
                       if (!f) return null;
-                      return <TableCell key={key}>{customCell(c, f)}</TableCell>;
+                      return (
+                        <TableCell key={key} className="align-top">
+                          {customCell(c, f)}
+                        </TableCell>
+                      );
                     })}
                     <TableCell>
                       <Select
@@ -1069,7 +1077,7 @@ export function CRM() {
           if (!o) resetFieldForm();
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nieuw veld toevoegen</DialogTitle>
             <DialogDescription>
@@ -1203,7 +1211,7 @@ export function CRM() {
 
       {/* Kolommen beheren */}
       <Dialog open={manageOpen} onOpenChange={setManageOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kolommen beheren</DialogTitle>
             <DialogDescription>
@@ -1240,7 +1248,7 @@ export function CRM() {
                         value={f!.type}
                         onValueChange={(v) => patchField(f!.id, { type: v as CrmFieldType })}
                       >
-                        <SelectTrigger className="w-[150px]">
+                        <SelectTrigger className="w-full sm:w-[150px]">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1403,7 +1411,7 @@ export function CRM() {
 
       {/* Nieuwe map */}
       <Dialog open={folderOpen} onOpenChange={setFolderOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nieuwe map</DialogTitle>
             <DialogDescription>
@@ -1451,7 +1459,7 @@ export function CRM() {
 
       {/* Mappen beheren */}
       <Dialog open={manageFoldersOpen} onOpenChange={setManageFoldersOpen}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Mappen beheren</DialogTitle>
             <DialogDescription>
