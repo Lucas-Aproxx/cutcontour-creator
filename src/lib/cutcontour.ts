@@ -125,7 +125,7 @@ export async function addCutContour(
     // Wrap in an Optional Content Group so it's a real "Cutcontour" layer
     const ocgDict = pdfDoc.context.obj({
       Type: "OCG",
-      Name: "Cutcontour",
+      Name: color.name,
       Intent: [PDFName.of("View"), PDFName.of("Design")],
     });
     const ocgRef = pdfDoc.context.register(ocgDict);
