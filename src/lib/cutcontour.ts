@@ -28,14 +28,14 @@ export const PUBLI_FDM_CUT_COLOR: CutColor = {
 
 /**
  * Add a Separation spot color layer with the given shapes and
- * return the modified PDF bytes. Strokes are 0.25pt in the chosen spot color
- * (default: Publi-FDM "Cutcontour" 100% magenta).
+ * return the modified PDF bytes. Strokes are 0.25pt in de Publi-FDM
+ * "Cutcontour" steunkleur: 100% magenta (CMYK 0/100/0/0).
  */
 export async function addCutContour(
   pdfBytes: ArrayBuffer,
   shapes: CutShape[],
-  color: CutColor = PUBLI_FDM_CUT_COLOR,
 ): Promise<Uint8Array> {
+  const color = PUBLI_FDM_CUT_COLOR;
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const pages = pdfDoc.getPages();
 
