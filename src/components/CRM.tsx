@@ -718,8 +718,9 @@ export function CRM() {
   };
 
   const addOptionTo = (field: CrmField) => {
+    const current = fieldPending.current[field.id]?.options ?? field.options;
     patchField(field.id, {
-      options: [...field.options, { id: newOptionId(), label: "Nieuwe optie", color: "slate" }],
+      options: [...current, { id: newOptionId(), label: "Nieuwe optie", color: "slate" }],
     });
   };
 
@@ -922,6 +923,13 @@ export function CRM() {
               <Settings2 className="w-4 h-4 mr-1" />
               Kolommen beheren
             </Button>
+            <span className="text-xs text-muted-foreground min-w-[110px]">
+              {fieldSaving > 0
+                ? "Velden opslaan…"
+                : fieldSavedAt
+                  ? "Velden opgeslagen"
+                  : ""}
+            </span>
           </div>
         </div>
 
@@ -1226,7 +1234,13 @@ export function CRM() {
       </Dialog>
 
       {/* Kolommen beheren */}
-      <Dialog open={manageOpen} onOpenChange={setManageOpen}>
+      <Dialog
+        open={manageOpen}
+        onOpenChange={(o) => {
+          setManageOpen(o);
+          if (!o) void flushAllFields();
+        }}
+      >
         <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kolommen beheren</DialogTitle>
