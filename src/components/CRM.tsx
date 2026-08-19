@@ -730,10 +730,41 @@ export function CRM() {
   /* ---------- Sorting ---------- */
 
   const visible = useMemo(() => {
-    if (activeFolder === "all") return contacts;
-    if (activeFolder === "none") return contacts.filter((c) => !c.folderId);
-    return contacts.filter((c) => c.folderId === activeFolder);
-  }, [contacts, activeFolder]);
+    const base =
+      activeFolder === "all"
+        ? contacts
+        : activeFolder === "none"
+          ? contacts.filter((c) => !c.folderId)
+          : contacts.filter((c) => c.folderId === activeFolder);
+    const q = query.trim().toLowerCase();
+    if (!q) return base;
+    const terms = q.split(/\s+/);
+    return base.filter((c) => {
+      const customText = fields
+        .map((f) => {
+          const v = c.custom[f.id] ?? "";
+          if (!v) return "";
+          if (f.type === "dropdown") return f.options.find((o) => o.id === v)?.label ?? "";
+          return v;
+        })
+        .join(" ");
+      const hay = [
+        c.name,
+        c.phone,
+        c.email,
+        c.note,
+        c.followUpDate,
+        statusLabel(c.status),
+        flagLabel(c.flag),
+        folders.find((f) => f.id === c.folderId)?.name ?? "",
+        customText,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    });
+  }, [contacts, activeFolder, query, fields, folders]);
+
 
   const sorted = useMemo(() => {
     const arr = [...visible];
