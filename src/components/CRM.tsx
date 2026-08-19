@@ -1137,7 +1137,7 @@ export function CRM() {
                         )
                       }
                     >
-                      <SelectTrigger className={`w-[130px] border ${colorClass(o.color)}`}>
+                      <SelectTrigger className={`w-full sm:w-[130px] shrink-0 border ${colorClass(o.color)}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1315,7 +1315,7 @@ export function CRM() {
                               })
                             }
                           >
-                            <SelectTrigger className={`w-[130px] border ${colorClass(o.color)}`}>
+                            <SelectTrigger className={`w-full sm:w-[130px] shrink-0 border ${colorClass(o.color)}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1476,7 +1476,7 @@ export function CRM() {
                   maxLength={60}
                 />
                 <Select value={f.color} onValueChange={(v) => patchFolder(f.id, { color: v })}>
-                  <SelectTrigger className={`w-[130px] border ${colorClass(f.color)}`}>
+                  <SelectTrigger className={`w-full sm:w-[130px] shrink-0 border ${colorClass(f.color)}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
