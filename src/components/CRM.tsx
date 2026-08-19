@@ -1383,9 +1383,21 @@ export function CRM() {
               );
             })}
           </div>
-          <DialogFooter>
-            <Button onClick={() => setManageOpen(false)}>Sluiten</Button>
+          <DialogFooter className="items-center gap-2 sm:justify-between">
+            <span className="text-xs text-muted-foreground">
+              {fieldSaving > 0 ? "Opslaan…" : fieldSavedAt ? "Alles opgeslagen" : ""}
+            </span>
+            <Button
+              onClick={async () => {
+                await flushAllFields();
+                toast.success("Veldinstellingen opgeslagen");
+                setManageOpen(false);
+              }}
+            >
+              Opslaan en sluiten
+            </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
