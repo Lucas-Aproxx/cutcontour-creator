@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addCutContour, type CutShape, type ShapeType } from "@/lib/cutcontour";
-import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler } from "lucide-react";
+import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { PDFDocument } from "pdf-lib";
 
 // pdf.js
@@ -69,6 +70,16 @@ export function CutContourEditor() {
   const [tool, setTool] = useState<ShapeType>("rect");
   const [drawing, setDrawing] = useState<null | { startX: number; startY: number; curX: number; curY: number }>(null);
   const [exporting, setExporting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState("");
+  const [progressDone, setProgressDone] = useState(false);
+
+  const step = async (pct: number, label: string) => {
+    setProgress(pct);
+    setProgressLabel(label);
+    // Geef de browser de kans om de voortgangsbalk te tekenen.
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [newPresetName, setNewPresetName] = useState("");
@@ -200,18 +211,27 @@ export function CutContourEditor() {
   const handleExport = async () => {
     if (!fileBytes) return;
     setExporting(true);
+    setProgressDone(false);
     try {
-      const bytes = await addCutContour(fileBytes.slice(0), shapes);
+      await step(10, "PDF inlezen…");
+      const source = fileBytes.slice(0);
+      await step(35, `Cutcontour-laag opbouwen (${shapes.length} contouren)…`);
+      const bytes = await addCutContour(source, shapes);
+      await step(75, "CMYK-drukprofiel toevoegen…");
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
+      await step(90, "Download klaarzetten…");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = fileName.replace(/\.pdf$/i, "") + "_cutcontour.pdf";
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("PDF geëxporteerd met Cutcontour-laag");
+      await step(100, "Klaar — CMYK-PDF gedownload");
+      setProgressDone(true);
+      toast.success("CMYK-PDF klaar en gedownload (met Cutcontour-laag)");
     } catch (err) {
       console.error(err);
+      setProgressLabel("Export mislukt");
       toast.error("Export mislukt: " + (err as Error).message);
     } finally {
       setExporting(false);
@@ -224,10 +244,16 @@ export function CutContourEditor() {
       return;
     }
     setExporting(true);
+    setProgressDone(false);
     try {
+      await step(5, "Meetblad voorbereiden…");
       const outDoc = await PDFDocument.create();
       const SCALE = 2; // render resolution factor for crisp text
       for (let i = 0; i < pageCount; i++) {
+        await step(
+          5 + Math.round((i / Math.max(1, pageCount)) * 85),
+          `Pagina ${i + 1} van ${pageCount} uitmeten…`,
+        );
         const page = await pdfDoc.getPage(i + 1);
         const vp = page.getViewport({ scale: SCALE });
         const canvas = document.createElement("canvas");
@@ -340,6 +366,7 @@ export function CutContourEditor() {
         outPage.drawImage(img, { x: 0, y: 0, width: size.width, height: size.height });
       }
 
+      await step(92, "Meetblad opslaan…");
       const bytes = await outDoc.save();
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
@@ -348,9 +375,12 @@ export function CutContourEditor() {
       a.download = (fileName.replace(/\.pdf$/i, "") || "meetblad") + "_boorgaten.pdf";
       a.click();
       URL.revokeObjectURL(url);
+      await step(100, "Klaar — meetblad gedownload");
+      setProgressDone(true);
       toast.success("Boorgat-meetblad geëxporteerd");
     } catch (err) {
       console.error(err);
+      setProgressLabel("Export mislukt");
       toast.error("Export mislukt: " + (err as Error).message);
     } finally {
       setExporting(false);
@@ -575,8 +605,18 @@ export function CutContourEditor() {
               </Button>
             </label>
             <Button onClick={handleExport} disabled={!fileBytes || exporting}>
-              <Download className="w-4 h-4 mr-2" />
-              {exporting ? "Exporteren..." : "Download PDF"}
+              {exporting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : progressDone ? (
+                <Check className="w-4 h-4 mr-2" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              {exporting
+                ? `CMYK-PDF maken… ${progress}%`
+                : progressDone
+                  ? "CMYK-PDF gedownload"
+                  : "Download CMYK-PDF"}
             </Button>
             <Button
               onClick={handleExportAnnotated}
@@ -589,6 +629,29 @@ export function CutContourEditor() {
             </Button>
           </div>
         </div>
+        {(exporting || progressDone) && (
+          <div className="max-w-[1400px] mx-auto px-6 pb-4">
+            <div className="rounded-lg border bg-card p-3">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className="text-sm font-medium flex items-center gap-2">
+                  {exporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4 text-primary" />
+                  )}
+                  {progressLabel}
+                </span>
+                <span className="text-sm tabular-nums text-muted-foreground">{progress}%</span>
+              </div>
+              <Progress value={progress} />
+              {progressDone && !exporting && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  De CMYK-versie is volledig aangemaakt en staat in je downloads.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="max-w-[1400px] mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">

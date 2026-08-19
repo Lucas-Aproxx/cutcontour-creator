@@ -474,23 +474,38 @@ export function CRM() {
   const fieldPending = useRef<
     Record<string, Partial<Pick<CrmField, "name" | "options" | "position" | "type">>>
   >({});
+  const [fieldSaving, setFieldSaving] = useState(0);
+  const [fieldSavedAt, setFieldSavedAt] = useState<number | null>(null);
 
-  const flushField = (id: string) => {
+  const flushField = (id: string): Promise<void> => {
     const p = fieldPending.current[id];
-    if (!p || Object.keys(p).length === 0) return;
+    if (!p || Object.keys(p).length === 0) return Promise.resolve();
     delete fieldPending.current[id];
     const t = fieldTimers.current[id];
     if (t) {
       clearTimeout(t);
       delete fieldTimers.current[id];
     }
-    updateCrmField(id, p).catch((err) =>
-      toast.error("Veld opslaan mislukt: " + (err as Error).message),
-    );
+    setFieldSaving((n) => n + 1);
+    return updateCrmField(id, p)
+      .then(() => {
+        setFieldSavedAt(Date.now());
+      })
+      .catch((err) => {
+        // Bewaar de wijziging zodat een volgende poging ze opnieuw wegschrijft.
+        fieldPending.current[id] = { ...p, ...(fieldPending.current[id] ?? {}) };
+        toast.error("Veld opslaan mislukt: " + (err as Error).message);
+      })
+      .finally(() => setFieldSaving((n) => Math.max(0, n - 1)));
   };
 
+  const flushAllFields = () =>
+    Promise.all(Object.keys(fieldPending.current).map((id) => flushField(id)));
+
   useEffect(() => {
-    const flushAll = () => Object.keys(fieldPending.current).forEach((id) => flushField(id));
+    const flushAll = () => {
+      void flushAllFields();
+    };
     window.addEventListener("beforeunload", flushAll);
     window.addEventListener("pagehide", flushAll);
     return () => {
@@ -509,8 +524,9 @@ export function CRM() {
     fieldPending.current[id] = { ...(fieldPending.current[id] ?? {}), ...p };
     const existing = fieldTimers.current[id];
     if (existing) clearTimeout(existing);
-    fieldTimers.current[id] = setTimeout(() => flushField(id), 500);
+    fieldTimers.current[id] = setTimeout(() => void flushField(id), 500);
   };
+
 
 
   /* ---------- Cel-renderers ---------- */
@@ -702,8 +718,9 @@ export function CRM() {
   };
 
   const addOptionTo = (field: CrmField) => {
+    const current = fieldPending.current[field.id]?.options ?? field.options;
     patchField(field.id, {
-      options: [...field.options, { id: newOptionId(), label: "Nieuwe optie", color: "slate" }],
+      options: [...current, { id: newOptionId(), label: "Nieuwe optie", color: "slate" }],
     });
   };
 
@@ -906,6 +923,13 @@ export function CRM() {
               <Settings2 className="w-4 h-4 mr-1" />
               Kolommen beheren
             </Button>
+            <span className="text-xs text-muted-foreground min-w-[110px]">
+              {fieldSaving > 0
+                ? "Velden opslaan…"
+                : fieldSavedAt
+                  ? "Velden opgeslagen"
+                  : ""}
+            </span>
           </div>
         </div>
 
@@ -1210,7 +1234,13 @@ export function CRM() {
       </Dialog>
 
       {/* Kolommen beheren */}
-      <Dialog open={manageOpen} onOpenChange={setManageOpen}>
+      <Dialog
+        open={manageOpen}
+        onOpenChange={(o) => {
+          setManageOpen(o);
+          if (!o) void flushAllFields();
+        }}
+      >
         <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kolommen beheren</DialogTitle>
@@ -1353,9 +1383,21 @@ export function CRM() {
               );
             })}
           </div>
-          <DialogFooter>
-            <Button onClick={() => setManageOpen(false)}>Sluiten</Button>
+          <DialogFooter className="items-center gap-2 sm:justify-between">
+            <span className="text-xs text-muted-foreground">
+              {fieldSaving > 0 ? "Opslaan…" : fieldSavedAt ? "Alles opgeslagen" : ""}
+            </span>
+            <Button
+              onClick={async () => {
+                await flushAllFields();
+                toast.success("Veldinstellingen opgeslagen");
+                setManageOpen(false);
+              }}
+            >
+              Opslaan en sluiten
+            </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
