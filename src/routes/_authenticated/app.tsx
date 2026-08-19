@@ -43,7 +43,7 @@ function AppLayout() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b bg-background sticky top-0 z-10">
-        <div className="max-w-[2200px] mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="max-w-[2200px] mx-auto px-3 sm:px-4 lg:px-6 py-3 flex items-center justify-between gap-3">
           <Link to="/app" className="font-semibold tracking-tight hover:opacity-80 transition-opacity">
             Cutcontour Studio
           </Link>
