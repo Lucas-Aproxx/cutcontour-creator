@@ -824,6 +824,55 @@ export function CRM() {
     }
   };
 
+  const exportVisibleCsv = () => {
+    const esc = (v: string) => (/[;\n"]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const folderName = (id: string) => folders.find((f) => f.id === id)?.name ?? "";
+    const header = [
+      "Naam",
+      "Telefoon",
+      "Email",
+      "Status",
+      "Markering",
+      "Terugcontact",
+      "Map",
+      "Notitie",
+      ...fields.map((f) => f.name || "Veld"),
+    ];
+    const rows = sorted.map((c) => [
+      c.name,
+      c.phone,
+      c.email,
+      STATUS_LABEL[c.status] ?? "",
+      FLAG_LABEL[c.flag] ?? "",
+      c.followUpDate || "",
+      folderName(c.folderId),
+      c.note,
+      ...fields.map((f) => {
+        const v = c.custom[f.id] ?? "";
+        if (!v) return "";
+        return f.type === "dropdown" ? (f.options.find((o) => o.id === v)?.label ?? "") : v;
+      }),
+    ]);
+    const csv =
+      "\uFEFF" +
+      [header, ...rows].map((r) => r.map((v) => esc(String(v ?? ""))).join(";")).join("\n");
+    const label =
+      activeFolder === "all"
+        ? "alle-contacten"
+        : activeFolder === "none"
+          ? "zonder-map"
+          : (folders.find((f) => f.id === activeFolder)?.name || "map");
+    const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `crm-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${rows.length} contact(en) geëxporteerd`);
+  };
+
+
   const deleteTarget = contacts.find((c) => c.id === deleteId) || null;
   const deleteFieldTarget = fields.find((f) => f.id === deleteFieldId) || null;
   const deleteFolderTarget = folders.find((f) => f.id === deleteFolderId) || null;
