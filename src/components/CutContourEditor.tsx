@@ -748,7 +748,7 @@ export function CutContourEditor() {
                         top: s.y * 100 + "%",
                         width: s.w * 100 + "%",
                         height: s.h * 100 + "%",
-                        borderColor: selectedId === s.id ? "oklch(0.7 0.3 30)" : cutColor.preview,
+                        borderColor: selectedId === s.id ? "oklch(0.7 0.3 30)" : CUT_COLOR_PREVIEW,
                         borderRadius: s.type === "ellipse" ? "50%" : 0,
                         boxShadow: selectedId === s.id ? "0 0 0 2px oklch(0.7 0.3 30 / 0.3)" : undefined,
                       }}
@@ -759,7 +759,7 @@ export function CutContourEditor() {
                       className="absolute border-2 border-dashed pointer-events-none"
                       style={{
                         ...rectPreview,
-                        borderColor: cutColor.preview,
+                        borderColor: CUT_COLOR_PREVIEW,
                         borderRadius: tool === "ellipse" ? "50%" : 0,
                       }}
                     />
