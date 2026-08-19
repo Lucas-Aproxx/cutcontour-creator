@@ -464,20 +464,47 @@ export function CRM() {
   };
 
   const fieldTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const fieldPending = useRef<
+    Record<string, Partial<Pick<CrmField, "name" | "options" | "position" | "type">>>
+  >({});
+
+  const flushField = (id: string) => {
+    const p = fieldPending.current[id];
+    if (!p || Object.keys(p).length === 0) return;
+    delete fieldPending.current[id];
+    const t = fieldTimers.current[id];
+    if (t) {
+      clearTimeout(t);
+      delete fieldTimers.current[id];
+    }
+    updateCrmField(id, p).catch((err) =>
+      toast.error("Veld opslaan mislukt: " + (err as Error).message),
+    );
+  };
+
+  useEffect(() => {
+    const flushAll = () => Object.keys(fieldPending.current).forEach((id) => flushField(id));
+    window.addEventListener("beforeunload", flushAll);
+    window.addEventListener("pagehide", flushAll);
+    return () => {
+      window.removeEventListener("beforeunload", flushAll);
+      window.removeEventListener("pagehide", flushAll);
+      flushAll();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const patchField = (
     id: string,
     p: Partial<Pick<CrmField, "name" | "options" | "position" | "type">>,
   ) => {
     setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...p } : f)));
+    fieldPending.current[id] = { ...(fieldPending.current[id] ?? {}), ...p };
     const existing = fieldTimers.current[id];
     if (existing) clearTimeout(existing);
-    fieldTimers.current[id] = setTimeout(() => {
-      updateCrmField(id, p).catch((err) =>
-        toast.error("Veld opslaan mislukt: " + (err as Error).message),
-      );
-    }, 500);
+    fieldTimers.current[id] = setTimeout(() => flushField(id), 500);
   };
+
 
   /* ---------- Cel-renderers ---------- */
 
