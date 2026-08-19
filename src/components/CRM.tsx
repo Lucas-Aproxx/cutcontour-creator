@@ -363,21 +363,49 @@ export function CRM() {
 
 
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pending = useRef<Record<string, Partial<Contact>>>({});
+
+  const flushContact = (id: string) => {
+    const p = pending.current[id];
+    if (!p || Object.keys(p).length === 0) return;
+    delete pending.current[id];
+    const t = timers.current[id];
+    if (t) {
+      clearTimeout(t);
+      delete timers.current[id];
+    }
+    updateContact(id, p).catch((err) =>
+      toast.error("Opslaan mislukt: " + (err as Error).message),
+    );
+  };
 
   const patch = (id: string, p: Partial<Contact>) => {
     setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...p } : c)));
+    // Merge zodat gelijktijdige wijzigingen aan meerdere velden niet verloren gaan.
+    pending.current[id] = { ...(pending.current[id] ?? {}), ...p };
     const existing = timers.current[id];
     if (existing) clearTimeout(existing);
-    timers.current[id] = setTimeout(() => {
-      updateContact(id, p).catch((err) =>
-        toast.error("Opslaan mislukt: " + (err as Error).message),
-      );
-    }, 500);
+    timers.current[id] = setTimeout(() => flushContact(id), 500);
   };
 
+  // Nog niet opgeslagen wijzigingen wegschrijven bij verlaten van de pagina.
+  useEffect(() => {
+    const flushAll = () => Object.keys(pending.current).forEach((id) => flushContact(id));
+    window.addEventListener("beforeunload", flushAll);
+    window.addEventListener("pagehide", flushAll);
+    return () => {
+      window.removeEventListener("beforeunload", flushAll);
+      window.removeEventListener("pagehide", flushAll);
+      flushAll();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const patchCustom = (c: Contact, fieldId: string, value: string) => {
-    patch(c.id, { custom: { ...c.custom, [fieldId]: value } });
+    const latest = pending.current[c.id]?.custom ?? c.custom;
+    patch(c.id, { custom: { ...latest, [fieldId]: value } });
   };
+
 
   const remove = async (id: string) => {
     try {
