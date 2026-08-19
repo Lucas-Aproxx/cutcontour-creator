@@ -84,8 +84,6 @@ export function CutContourEditor() {
     await new Promise((r) => requestAnimationFrame(() => r(null)));
   };
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [colorIdx, setColorIdx] = useState(0);
-  const cutColor = CUT_COLORS[colorIdx] ?? CUT_COLORS[0];
   const [presets, setPresets] = useState<Preset[]>([]);
   const [newPresetName, setNewPresetName] = useState("");
 
