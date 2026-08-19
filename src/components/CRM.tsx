@@ -222,6 +222,7 @@ export function CRM() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteFieldId, setDeleteFieldId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   // New contact form
   const [nName, setNName] = useState("");
