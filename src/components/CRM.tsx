@@ -51,6 +51,8 @@ import {
   GripVertical,
   Inbox,
   Users,
+  Search,
+  Download,
 } from "lucide-react";
 
 import {
