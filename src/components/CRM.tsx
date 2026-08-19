@@ -160,13 +160,13 @@ interface BuiltinCol {
 }
 
 const BUILTIN_COLS: BuiltinCol[] = [
-  { key: "b:name", label: "Naam", width: "min-w-[160px]" },
-  { key: "b:phone", label: "Telefoon", width: "min-w-[140px]" },
-  { key: "b:email", label: "Email", width: "min-w-[180px]" },
+  { key: "b:name", label: "Naam", width: "min-w-[180px]" },
+  { key: "b:phone", label: "Telefoon", width: "min-w-[150px]" },
+  { key: "b:email", label: "Email", width: "min-w-[220px]" },
   { key: "b:status", label: "Status", width: "min-w-[190px]" },
   { key: "b:flag", label: "Markering", width: "min-w-[180px]" },
   { key: "b:followUpDate", label: "Terugcontact", width: "min-w-[160px]" },
-  { key: "b:note", label: "Notitie", width: "min-w-[220px]" },
+  { key: "b:note", label: "Notitie", width: "min-w-[260px] w-[24%]" },
 ];
 
 /** Tekstvak dat automatisch meegroeit met de inhoud. */
@@ -190,6 +190,12 @@ function AutoTextarea({
 
   useEffect(resize, [value]);
 
+  useEffect(() => {
+    const onResize = () => resize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   return (
     <Textarea
       ref={ref}
@@ -200,10 +206,11 @@ function AutoTextarea({
         onChange(e.target.value);
         resize();
       }}
-      className="min-h-[40px] resize-none overflow-hidden"
+      className="w-full min-h-[40px] resize-none overflow-hidden break-words leading-snug"
     />
   );
 }
+
 
 
 export function CRM() {
