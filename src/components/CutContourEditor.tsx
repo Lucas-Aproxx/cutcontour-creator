@@ -22,18 +22,8 @@ interface PageDims {
 
 const PT_PER_MM = 72 / 25.4;
 
-/**
- * Steunkleuren voor de snijlijn. Publi-FDM schrijft voor: een aparte laag
- * "Cutcontour" met de snijlijn in 100% magenta (CMYK 0/100/0/0).
- */
-const CUT_COLORS: Array<CutColor & { label: string; preview: string; note?: string }> = [
-  { ...PUBLI_FDM_CUT_COLOR, label: "Magenta 100% — Publi-FDM norm", preview: "#e6007e", note: "Aanbevolen: dit is de standaard volgens Publi-FDM (laag \"Cutcontour\", CMYK 0/100/0/0)." },
-  { name: "Cutcontour", cmyk: [1, 0, 0, 0], label: "Cyaan 100%", preview: "#00a0e3" },
-  { name: "Cutcontour", cmyk: [0, 0, 1, 0], label: "Geel 100%", preview: "#ffed00" },
-  { name: "Cutcontour", cmyk: [0, 0, 0, 1], label: "Zwart 100%", preview: "#1a1a1a" },
-  { name: "Cutcontour", cmyk: [1, 0, 1, 0], label: "Groen (C100 Y100)", preview: "#00a651" },
-  { name: "Cutcontour", cmyk: [0, 1, 1, 0], label: "Rood (M100 Y100)", preview: "#e2231a" },
-];
+/** Vaste contourkleur: Publi-FDM 100% magenta. */
+const CUT_COLOR_PREVIEW = "#e6007e";
 
 function MmInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
   const [draft, setDraft] = useState<string>(Number(value.toFixed(2)).toString());
