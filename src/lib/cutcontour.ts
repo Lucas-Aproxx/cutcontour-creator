@@ -13,36 +13,52 @@ export interface CutShape {
   h: number;
 }
 
+export interface CutColor {
+  /** Naam van de steunkleur (separation), bv. "Cutcontour" */
+  name: string;
+  /** CMYK-waarde bij 100% tint, elk 0..1 */
+  cmyk: [number, number, number, number];
+}
+
+/** Publi-FDM norm: steunkleur "Cutcontour" in 100% magenta (0/100/0/0). */
+export const PUBLI_FDM_CUT_COLOR: CutColor = {
+  name: "Cutcontour",
+  cmyk: [0, 1, 0, 0],
+};
+
 /**
- * Add a Separation "Cutcontour" spot color layer with the given shapes and
- * return the modified PDF bytes. Strokes are 0.25pt magenta (0,1,0,0 CMYK).
+ * Add a Separation spot color layer with the given shapes and
+ * return the modified PDF bytes. Strokes are 0.25pt in the chosen spot color
+ * (default: Publi-FDM "Cutcontour" 100% magenta).
  */
 export async function addCutContour(
   pdfBytes: ArrayBuffer,
   shapes: CutShape[],
+  color: CutColor = PUBLI_FDM_CUT_COLOR,
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const pages = pdfDoc.getPages();
 
-  // Build shared tint transform function: t -> (0, t, 0, 0) in CMYK
+  // Build shared tint transform function: t -> (t*C, t*M, t*Y, t*K) in CMYK
   const tintFn = pdfDoc.context.obj({
     FunctionType: 2,
     Domain: [0, 1],
     Range: [0, 1, 0, 1, 0, 1, 0, 1],
     C0: [0, 0, 0, 0],
-    C1: [0, 1, 0, 0],
+    C1: [...color.cmyk],
     N: 1,
   });
   const tintFnRef = pdfDoc.context.register(tintFn);
 
-  // Separation color space array [/Separation /Cutcontour /DeviceCMYK <function>]
+  // Separation color space array [/Separation /<name> /DeviceCMYK <function>]
   const sepArray = pdfDoc.context.obj([
     PDFName.of("Separation"),
-    PDFName.of("Cutcontour"),
+    PDFName.of(color.name),
     PDFName.of("DeviceCMYK"),
     tintFnRef,
   ]);
   const sepRef = pdfDoc.context.register(sepArray);
+
 
   // Group shapes by page
   const byPage = new Map<number, CutShape[]>();
