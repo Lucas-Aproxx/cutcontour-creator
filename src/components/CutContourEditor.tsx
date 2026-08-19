@@ -285,7 +285,7 @@ export function CutContourEditor() {
           const isEllipse = s.type === "ellipse";
 
           // shape outline
-          ctx.strokeStyle = cutColor.preview;
+          ctx.strokeStyle = CUT_COLOR_PREVIEW;
           ctx.beginPath();
           if (isEllipse) {
             ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
