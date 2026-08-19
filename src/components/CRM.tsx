@@ -957,6 +957,15 @@ export function CRM() {
               <Settings2 className="w-4 h-4 mr-1" />
               Kolommen beheren
             </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={exportVisibleCsv}
+              disabled={sorted.length === 0}
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Exporteer (CSV)
+            </Button>
             <span className="text-xs text-muted-foreground min-w-[110px]">
               {fieldSaving > 0
                 ? "Velden opslaan…"
@@ -966,6 +975,28 @@ export function CRM() {
             </span>
           </div>
         </div>
+
+        <div className="mb-3 relative max-w-md">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Zoek op naam, telefoon, email, notitie…"
+            className="pl-9 pr-9"
+            aria-label="Zoek contacten"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Zoekopdracht wissen"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
 
 
         <div className="flex items-center gap-2 text-sm flex-wrap mb-3">
