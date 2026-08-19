@@ -222,7 +222,7 @@ export function CutContourEditor() {
       await step(10, "PDF inlezen…");
       const source = fileBytes.slice(0);
       await step(35, `Cutcontour-laag opbouwen (${shapes.length} contouren)…`);
-      const bytes = await addCutContour(source, shapes, PUBLI_FDM_CUT_COLOR);
+      const bytes = await addCutContour(source, shapes);
       await step(75, "CMYK-drukprofiel toevoegen…");
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       await step(90, "Download klaarzetten…");
