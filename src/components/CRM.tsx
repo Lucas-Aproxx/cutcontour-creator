@@ -1093,7 +1093,9 @@ export function CRM() {
 
         {sorted.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
-            Nog geen contacten. Voeg er hierboven één toe.
+            {query.trim()
+              ? `Geen resultaten voor “${query.trim()}”.`
+              : "Nog geen contacten. Voeg er hierboven één toe."}
           </p>
         ) : (
           <div className="-mx-4 overflow-x-auto px-4">
