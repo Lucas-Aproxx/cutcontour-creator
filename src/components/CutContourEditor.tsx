@@ -199,10 +199,13 @@ export function CutContourEditor() {
         const yTopMm = nextYmm - nextHmm / 2;
         return {
           ...s,
-          x: Math.max(0, Math.min(1, xTopMm / pW)),
-          y: Math.max(0, Math.min(1, yTopMm / pH)),
-          w: Math.max(0, Math.min(1, nextWmm / pW)),
-          h: Math.max(0, Math.min(1, nextHmm / pH)),
+          // Bewaar de exact ingevoerde maat. Niet begrenzen op 100% van de
+          // PDF-pagina: dat liet Y bij grotere documenten terugspringen naar
+          // de paginahoogte (bijvoorbeeld 1003,37 mm).
+          x: xTopMm / pW,
+          y: yTopMm / pH,
+          w: Math.max(0, nextWmm / pW),
+          h: Math.max(0, nextHmm / pH),
         };
       }),
     );
@@ -416,10 +419,12 @@ export function CutContourEditor() {
       id: crypto.randomUUID(),
       page: pageIndex,
       type: ps.type,
-      x: Math.max(0, Math.min(1, ps.xMm / pW)),
-      y: Math.max(0, Math.min(1, ps.yMm / pH)),
-      w: Math.max(0, Math.min(1, ps.wMm / pW)),
-      h: Math.max(0, Math.min(1, ps.hMm / pH)),
+      // Presets mogen hun exacte positie behouden, ook wanneer de gekozen
+      // PDF-pagina kleiner is dan het document waarop de preset is gemaakt.
+      x: ps.xMm / pW,
+      y: ps.yMm / pH,
+      w: Math.max(0, ps.wMm / pW),
+      h: Math.max(0, ps.hMm / pH),
     }));
     setShapes((s) => [...s, ...added]);
     setSelectedId(added[added.length - 1]?.id ?? null);
@@ -570,7 +575,6 @@ export function CutContourEditor() {
   const selHmm = selSize && selected ? selected.h * (selSize.height / PT_PER_MM) : 0;
   const selXmmRaw = selSize && selected ? selected.x * (selSize.width / PT_PER_MM) : 0;
   const selYmmRaw = selSize && selected ? selected.y * (selSize.height / PT_PER_MM) : 0;
-  const selPHmm = selSize ? selSize.height / PT_PER_MM : 0;
   // X = center from left; Y = center from TOP of page
   const selXmm = selXmmRaw + selWmm / 2;
   const selYmm = selYmmRaw + selHmm / 2;
