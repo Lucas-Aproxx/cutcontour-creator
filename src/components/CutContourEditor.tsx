@@ -779,24 +779,12 @@ export function CutContourEditor() {
               <Layers className="w-4 h-4 text-primary" />
               <h2 className="font-semibold">Contourkleur</h2>
             </div>
-            <Select value={String(colorIdx)} onValueChange={(v) => setColorIdx(Number(v))}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CUT_COLORS.map((c, i) => (
-                  <SelectItem key={c.label} value={String(i)}>
-                    <span className="flex items-center gap-2">
-                      <span className="inline-block w-3 h-3 rounded-full border" style={{ background: c.preview }} />
-                      {c.label}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="inline-block w-3 h-3 rounded-full border" style={{ background: CUT_COLOR_PREVIEW }} />
+              <span className="font-medium">Cutcontour — 100% magenta</span>
+            </div>
             <p className="text-xs text-muted-foreground">
-              {cutColor.note ??
-                `De snijlijn komt in de aparte laag "Cutcontour" als steunkleur CMYK ${cutColor.cmyk.map((v) => Math.round(v * 100)).join("/")}. Publi-FDM verwacht 100% magenta (0/100/0/0).`}
+              Volgens de Publi-FDM norm wordt de snijlijn altijd geëxporteerd in de aparte laag "Cutcontour" als steunkleur CMYK 0/100/0/0.
             </p>
           </Card>
 
