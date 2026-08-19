@@ -331,14 +331,14 @@ export function CutContourEditor() {
           if (by + boxH > canvas.height) by = Math.max(0, canvas.height - boxH);
 
           ctx.fillStyle = "rgba(255,255,255,0.92)";
-          ctx.strokeStyle = cutColor.preview;
+          ctx.strokeStyle = CUT_COLOR_PREVIEW;
           ctx.lineWidth = 1;
           ctx.fillRect(bx, by, boxW, boxH);
           ctx.strokeRect(bx, by, boxW, boxH);
           ctx.lineWidth = 2;
 
           // leader line to reference point
-          ctx.strokeStyle = cutColor.preview;
+          ctx.strokeStyle = CUT_COLOR_PREVIEW;
           ctx.setLineDash([4 * SCALE, 3 * SCALE]);
           ctx.beginPath();
           ctx.moveTo(bx, by + boxH / 2);
