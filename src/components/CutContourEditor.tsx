@@ -831,11 +831,15 @@ export function CutContourEditor() {
                         top: s.y * 100 + "%",
                         width: s.w * 100 + "%",
                         height: s.h * 100 + "%",
-                        borderColor: selectedId === s.id ? "oklch(0.7 0.3 30)" : colorOfLayer(layerOf(s)),
+                        borderColor: colorOfLayer(layerOf(s)),
                         borderRadius: s.type === "ellipse" ? "50%" : 0,
-                        boxShadow: selectedId === s.id ? "0 0 0 2px oklch(0.7 0.3 30 / 0.3)" : undefined,
+                        boxShadow:
+                          selectedId === s.id
+                            ? `0 0 0 1px #fff, 0 0 0 3px ${colorOfLayer(layerOf(s))}66`
+                            : undefined,
                       }}
                     />
+
                   ))}
                   {rectPreview && (
                     <div
