@@ -5,8 +5,24 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addCutContour, type CutShape, type ShapeType } from "@/lib/cutcontour";
-import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check } from "lucide-react";
+import {
+  addCutContour,
+  CUT_LAYER_COLORS,
+  DEFAULT_CUT_LAYERS,
+  DEFAULT_CUT_LAYER_ID,
+  layerPreviewColor,
+  type CutLayer,
+  type CutShape,
+  type ShapeType,
+} from "@/lib/cutcontour";
+import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check, Search, Pencil, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { PDFDocument } from "pdf-lib";
 
@@ -55,6 +71,7 @@ function MmInput({ value, onCommit }: { value: number; onCommit: (n: number) => 
 import {
   listPresets,
   createPresets,
+  updatePreset,
   deletePresetById,
   type Preset,
   type PresetShape,
@@ -86,6 +103,49 @@ export function CutContourEditor() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [newPresetName, setNewPresetName] = useState("");
+  const [presetQuery, setPresetQuery] = useState("");
+  const [editPreset, setEditPreset] = useState<{ id: string; name: string; shapes: PresetShape[] } | null>(null);
+  const [savingPreset, setSavingPreset] = useState(false);
+
+  /* ---------- Lagen (Publi-FDM / reclameonline.be) ---------- */
+  const [layers, setLayers] = useState<CutLayer[]>(DEFAULT_CUT_LAYERS);
+  const [activeLayerId, setActiveLayerId] = useState<string>(DEFAULT_CUT_LAYER_ID);
+  const [newLayerName, setNewLayerName] = useState("");
+  const [newLayerColor, setNewLayerColor] = useState<string>("cyan");
+
+  const layerOf = (s: CutShape) => s.layer || DEFAULT_CUT_LAYER_ID;
+  const layerById = (id: string) => layers.find((l) => l.id === id) ?? layers[0];
+  const colorOfLayer = (id: string) => layerPreviewColor(layerById(id)?.cmyk ?? [0, 1, 0, 0]);
+
+  const addLayer = () => {
+    const name = newLayerName.trim();
+    if (!name) {
+      toast.error("Geef de laag een naam");
+      return;
+    }
+    if (layers.some((l) => l.name.toLowerCase() === name.toLowerCase())) {
+      toast.error("Er bestaat al een laag met deze naam");
+      return;
+    }
+    const col = CUT_LAYER_COLORS.find((c) => c.key === newLayerColor) ?? CUT_LAYER_COLORS[1];
+    const id = crypto.randomUUID();
+    setLayers((l) => [...l, { id, name, cmyk: col.cmyk }]);
+    setActiveLayerId(id);
+    setNewLayerName("");
+    toast.success(`Laag "${name}" toegevoegd`);
+  };
+
+  const removeLayer = (id: string) => {
+    if (id === DEFAULT_CUT_LAYER_ID) {
+      toast.error("De laag \"Cutcontour\" is verplicht volgens de Publi-FDM norm");
+      return;
+    }
+    const count = shapes.filter((s) => layerOf(s) === id).length;
+    if (count > 0 && !window.confirm(`Deze laag bevat ${count} contour(en). Laag en contouren verwijderen?`)) return;
+    setShapes((all) => all.filter((s) => layerOf(s) !== id));
+    setLayers((l) => l.filter((x) => x.id !== id));
+    if (activeLayerId === id) setActiveLayerId(DEFAULT_CUT_LAYER_ID);
+  };
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -168,7 +228,7 @@ export function CutContourEditor() {
     setDrawing(null);
     if (w < 0.005 || h < 0.005) return;
     const id = crypto.randomUUID();
-    setShapes((s) => [...s, { id, page: pageIndex, type: tool, x, y, w, h }]);
+    setShapes((s) => [...s, { id, page: pageIndex, type: tool, layer: activeLayerId, x, y, w, h }]);
     setSelectedId(id);
   };
 
@@ -222,7 +282,7 @@ export function CutContourEditor() {
       await step(10, "PDF inlezen…");
       const source = fileBytes.slice(0);
       await step(35, `Cutcontour-laag opbouwen (${shapes.length} contouren)…`);
-      const bytes = await addCutContour(source, shapes);
+      const bytes = await addCutContour(source, shapes, layers);
       await step(75, "CMYK-drukprofiel toevoegen…");
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       await step(90, "Download klaarzetten…");
@@ -284,8 +344,9 @@ export function CutContourEditor() {
           const h = s.h * canvas.height;
           const isEllipse = s.type === "ellipse";
 
-          // shape outline
-          ctx.strokeStyle = CUT_COLOR_PREVIEW;
+          // shape outline in de kleur van zijn laag
+          const shapeColor = colorOfLayer(layerOf(s));
+          ctx.strokeStyle = shapeColor;
           ctx.beginPath();
           if (isEllipse) {
             ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
@@ -313,7 +374,7 @@ export function CutContourEditor() {
           const xmm = s.x * pWmm + wmm / 2;
           const ymm = s.y * pHmm + hmm / 2;
           const label = [
-            `#${idx + 1} ${isEllipse ? "⌀" : "▭"}`,
+            `#${idx + 1} ${isEllipse ? "⌀" : "▭"} · ${layerById(layerOf(s))?.name ?? "Cutcontour"}`,
             `X: ${xmm.toFixed(2)} mm`,
             `Y: ${ymm.toFixed(2)} mm`,
             `L: ${wmm.toFixed(2)} mm`,
@@ -331,14 +392,14 @@ export function CutContourEditor() {
           if (by + boxH > canvas.height) by = Math.max(0, canvas.height - boxH);
 
           ctx.fillStyle = "rgba(255,255,255,0.92)";
-          ctx.strokeStyle = CUT_COLOR_PREVIEW;
+          ctx.strokeStyle = shapeColor;
           ctx.lineWidth = 1;
           ctx.fillRect(bx, by, boxW, boxH);
           ctx.strokeRect(bx, by, boxW, boxH);
           ctx.lineWidth = 2;
 
           // leader line to reference point
-          ctx.strokeStyle = CUT_COLOR_PREVIEW;
+          ctx.strokeStyle = shapeColor;
           ctx.setLineDash([4 * SCALE, 3 * SCALE]);
           ctx.beginPath();
           ctx.moveTo(bx, by + boxH / 2);
@@ -403,7 +464,7 @@ export function CutContourEditor() {
       const size = pageSizesPt[s.page] ?? pageSize;
       const pW = size.width / PT_PER_MM;
       const pH = size.height / PT_PER_MM;
-      return { type: s.type, xMm: s.x * pW, yMm: s.y * pH, wMm: s.w * pW, hMm: s.h * pH };
+      return { type: s.type, layer: layerOf(s), xMm: s.x * pW, yMm: s.y * pH, wMm: s.w * pW, hMm: s.h * pH };
     });
     try {
       const created = await createPresets([{ name, shapes }]);
@@ -422,6 +483,7 @@ export function CutContourEditor() {
       id: crypto.randomUUID(),
       page: pageIndex,
       type: ps.type,
+      layer: layers.some((l) => l.id === ps.layer) ? ps.layer : activeLayerId,
       // Presets mogen hun exacte positie behouden, ook wanneer de gekozen
       // PDF-pagina kleiner is dan het document waarop de preset is gemaakt.
       x: ps.xMm / pW,
@@ -446,6 +508,30 @@ export function CutContourEditor() {
       toast.success(`Preset "${p.name}" verwijderd`);
     } catch (err) {
       toast.error("Verwijderen mislukt: " + (err as Error).message);
+    }
+  };
+
+  const filteredPresets = presets.filter((p) => {
+    const q = presetQuery.trim().toLowerCase();
+    if (!q) return true;
+    return q.split(/\s+/).every((t) => p.name.toLowerCase().includes(t));
+  });
+
+  const saveEditedPreset = async () => {
+    if (!editPreset) return;
+    const name = editPreset.name.trim() || "Preset";
+    setSavingPreset(true);
+    try {
+      await updatePreset(editPreset.id, { name, shapes: editPreset.shapes });
+      setPresets((prev) =>
+        prev.map((p) => (p.id === editPreset.id ? { ...p, name, shapes: editPreset.shapes } : p)),
+      );
+      setEditPreset(null);
+      toast.success("Preset bijgewerkt");
+    } catch (err) {
+      toast.error("Opslaan mislukt: " + (err as Error).message);
+    } finally {
+      setSavingPreset(false);
     }
   };
 
