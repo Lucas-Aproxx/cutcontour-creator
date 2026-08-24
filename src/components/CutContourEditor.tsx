@@ -38,9 +38,6 @@ interface PageDims {
 
 const PT_PER_MM = 72 / 25.4;
 
-/** Vaste contourkleur: Publi-FDM 100% magenta. */
-const CUT_COLOR_PREVIEW = "#e6007e";
-
 function MmInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
   const [draft, setDraft] = useState<string>(Number(value.toFixed(2)).toString());
   const focused = useRef(false);

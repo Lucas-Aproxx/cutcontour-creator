@@ -53,6 +53,7 @@ import {
   Users,
   Search,
   Download,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import {
@@ -824,7 +825,7 @@ export function CRM() {
     }
   };
 
-  const exportVisibleCsv = () => {
+  const exportRows = () => {
     const esc = (v: string) => (/[;\n"]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
     const folderName = (id: string) => folders.find((f) => f.id === id)?.name ?? "";
     const header = [
@@ -853,9 +854,6 @@ export function CRM() {
         return f.type === "dropdown" ? (f.options.find((o) => o.id === v)?.label ?? "") : v;
       }),
     ]);
-    const csv =
-      "\uFEFF" +
-      [header, ...rows].map((r) => r.map((v) => esc(String(v ?? ""))).join(";")).join("\n");
     const label =
       activeFolder === "all"
         ? "alle-contacten"
@@ -863,13 +861,54 @@ export function CRM() {
           ? "zonder-map"
           : (folders.find((f) => f.id === activeFolder)?.name || "map");
     const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    return { esc, header, rows, slug };
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `crm-${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`${rows.length} contact(en) geëxporteerd`);
+  };
+
+  const exportVisibleCsv = () => {
+    const { esc, header, rows, slug } = exportRows();
+    const csv =
+      "\uFEFF" +
+      [header, ...rows].map((r) => r.map((v) => esc(String(v ?? ""))).join(";")).join("\n");
+    downloadBlob(
+      new Blob([csv], { type: "text/csv;charset=utf-8" }),
+      `crm-${slug}-${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+    toast.success(`${rows.length} contact(en) geëxporteerd (CSV)`);
+  };
+
+  const exportVisibleXlsx = async () => {
+    const { header, rows, slug } = exportRows();
+    try {
+      const XLSX = await import("xlsx");
+      const sheet = XLSX.utils.aoa_to_sheet([header, ...rows.map((r) => r.map((v) => String(v ?? "")))]);
+      sheet["!cols"] = header.map((h, i) => ({
+        wch: Math.min(
+          50,
+          Math.max(12, h.length + 2, ...rows.map((r) => String(r[i] ?? "").length + 2)),
+        ),
+      }));
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, sheet, "Contacten");
+      const out = XLSX.write(book, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+      downloadBlob(
+        new Blob([out], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `crm-${slug}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      toast.success(`${rows.length} contact(en) geëxporteerd (Excel)`);
+    } catch (err) {
+      toast.error("Excel-export mislukt: " + (err as Error).message);
+    }
   };
 
 
@@ -1014,6 +1053,15 @@ export function CRM() {
             >
               <Download className="w-4 h-4 mr-1" />
               Exporteer (CSV)
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={exportVisibleXlsx}
+              disabled={sorted.length === 0}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1" />
+              Exporteer (Excel)
             </Button>
             <span className="text-xs text-muted-foreground min-w-[110px]">
               {fieldSaving > 0
