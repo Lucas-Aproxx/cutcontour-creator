@@ -8,6 +8,8 @@ export interface PresetShape {
   yMm: number;
   wMm: number;
   hMm: number;
+  /** Laag-id (bv. "cutcontour" of "boorgaten") */
+  layer?: string;
 }
 
 export interface Preset {
