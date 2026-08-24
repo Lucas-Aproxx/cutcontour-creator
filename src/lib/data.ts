@@ -8,6 +8,8 @@ export interface PresetShape {
   yMm: number;
   wMm: number;
   hMm: number;
+  /** Laag-id (bv. "cutcontour" of "boorgaten") */
+  layer?: string;
 }
 
 export interface Preset {
@@ -83,6 +85,7 @@ function normShapes(raw: unknown): PresetShape[] {
     yMm: Number(s?.yMm) || 0,
     wMm: Number(s?.wMm) || 0,
     hMm: Number(s?.hMm) || 0,
+    layer: s?.layer ? String(s.layer) : "cutcontour",
   }));
 }
 
@@ -119,6 +122,18 @@ export async function createPresets(
     .select("id, name, shapes");
   if (error) throw error;
   return (data ?? []).map((r) => ({ id: r.id, name: r.name, shapes: normShapes(r.shapes) }));
+}
+
+export async function updatePreset(
+  id: string,
+  patch: { name?: string; shapes?: PresetShape[] },
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.shapes !== undefined) row.shapes = patch.shapes as unknown as any;
+  if (Object.keys(row).length === 0) return;
+  const { error } = await supabase.from("presets").update(row as any).eq("id", id);
+  if (error) throw error;
 }
 
 export async function deletePresetById(id: string): Promise<void> {
