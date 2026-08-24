@@ -834,7 +834,7 @@ export function CutContourEditor() {
                         top: s.y * 100 + "%",
                         width: s.w * 100 + "%",
                         height: s.h * 100 + "%",
-                        borderColor: selectedId === s.id ? "oklch(0.7 0.3 30)" : CUT_COLOR_PREVIEW,
+                        borderColor: selectedId === s.id ? "oklch(0.7 0.3 30)" : colorOfLayer(layerOf(s)),
                         borderRadius: s.type === "ellipse" ? "50%" : 0,
                         boxShadow: selectedId === s.id ? "0 0 0 2px oklch(0.7 0.3 30 / 0.3)" : undefined,
                       }}
@@ -845,7 +845,7 @@ export function CutContourEditor() {
                       className="absolute border-2 border-dashed pointer-events-none"
                       style={{
                         ...rectPreview,
-                        borderColor: CUT_COLOR_PREVIEW,
+                        borderColor: colorOfLayer(activeLayerId),
                         borderRadius: tool === "ellipse" ? "50%" : 0,
                       }}
                     />
@@ -860,18 +860,75 @@ export function CutContourEditor() {
         </section>
 
         <aside className="space-y-4">
-          <Card className="p-4 space-y-2">
+          <Card className="p-4 space-y-3">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-primary" />
-              <h2 className="font-semibold">Contourkleur</h2>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="inline-block w-3 h-3 rounded-full border" style={{ background: CUT_COLOR_PREVIEW }} />
-              <span className="font-medium">Cutcontour — 100% magenta</span>
+              <h2 className="font-semibold">Lagen</h2>
+              <Badge variant="secondary" className="ml-auto">{layers.length}</Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              Volgens de Publi-FDM norm wordt de snijlijn altijd geëxporteerd in de aparte laag "Cutcontour" als steunkleur CMYK 0/100/0/0.
+              Elke laag wordt als aparte OCG-laag met eigen steunkleur geëxporteerd (Publi-FDM / reclameonline.be).
+              Zo kunnen boorgaten en contourlijnen nooit met elkaar in conflict komen. De laag "Cutcontour" is altijd
+              100% magenta (CMYK 0/100/0/0).
             </p>
+            <ul className="space-y-1">
+              {layers.map((l) => {
+                const count = shapes.filter((s) => layerOf(s) === l.id).length;
+                return (
+                  <li
+                    key={l.id}
+                    onClick={() => setActiveLayerId(l.id)}
+                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer text-sm ${
+                      activeLayerId === l.id ? "bg-primary/10 ring-1 ring-primary" : "bg-muted"
+                    }`}
+                  >
+                    <span
+                      className="inline-block w-3 h-3 rounded-full border shrink-0"
+                      style={{ background: layerPreviewColor(l.cmyk) }}
+                    />
+                    <span className="flex-1 min-w-0 truncate font-medium">{l.name}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+                    {l.id !== DEFAULT_CUT_LAYER_ID && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-6 h-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeLayer(l.id);
+                        }}
+                        title="Laag verwijderen"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="space-y-2 pt-1">
+              <Input
+                placeholder="Nieuwe laagnaam (bv. Boorgaten)"
+                value={newLayerName}
+                onChange={(e) => setNewLayerName(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <select
+                  className="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  value={newLayerColor}
+                  onChange={(e) => setNewLayerColor(e.target.value)}
+                >
+                  {CUT_LAYER_COLORS.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <Button size="sm" variant="outline" onClick={addLayer}>
+                  <Plus className="w-4 h-4 mr-1" /> Laag
+                </Button>
+              </div>
+            </div>
           </Card>
 
           {selected && (
@@ -898,6 +955,23 @@ export function CutContourEditor() {
                   <Label className="text-xs">B (hoogte)</Label>
                   <MmInput value={selHmm} onCommit={(n) => updateSelectedMm({ hMm: n })} />
                 </div>
+              </div>
+              <div>
+                <Label className="text-xs">Laag</Label>
+                <select
+                  className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                  value={layerOf(selected)}
+                  onChange={(e) => {
+                    const lid = e.target.value;
+                    setShapes((all) => all.map((s) => (s.id === selected.id ? { ...s, layer: lid } : s)));
+                  }}
+                >
+                  {layers.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex gap-2 pt-1">
                 <Input
@@ -957,13 +1031,24 @@ export function CutContourEditor() {
                 </span>
               </label>
             </div>
+            <div className="relative mb-3">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Zoek preset op naam..."
+                value={presetQuery}
+                onChange={(e) => setPresetQuery(e.target.value)}
+              />
+            </div>
             {presets.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Nog geen presets. Teken contouren en klik "Pagina opslaan" om alle contouren op deze pagina als preset te bewaren.
               </p>
+            ) : filteredPresets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Geen presets gevonden voor "{presetQuery}".</p>
             ) : (
               <ul className="space-y-2 max-h-[240px] overflow-y-auto">
-                {presets.map((p) => (
+                {filteredPresets.map((p) => (
                   <li key={p.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted">
                     <Layers className="w-4 h-4 text-primary shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -981,6 +1066,17 @@ export function CutContourEditor() {
                       title="Toevoegen aan pagina"
                     >
                       <Plus className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-7 h-7"
+                      onClick={() =>
+                        setEditPreset({ id: p.id, name: p.name, shapes: p.shapes.map((s) => ({ ...s })) })
+                      }
+                      title="Preset bewerken"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -1026,7 +1122,8 @@ export function CutContourEditor() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">Contour {i + 1}</p>
                         <p className="text-xs text-muted-foreground">
-                          Pagina {s.page + 1} · {wmm.toFixed(1)}×{hmm.toFixed(1)} mm
+                          Pagina {s.page + 1} · {wmm.toFixed(1)}×{hmm.toFixed(1)} mm ·{" "}
+                          {layerById(layerOf(s))?.name}
                         </p>
                       </div>
                       <Button
@@ -1049,6 +1146,131 @@ export function CutContourEditor() {
           </Card>
         </aside>
       </main>
+
+      <Dialog open={!!editPreset} onOpenChange={(o) => !o && setEditPreset(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Preset bewerken</DialogTitle>
+          </DialogHeader>
+          {editPreset && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs">Naam</Label>
+                <Input
+                  value={editPreset.name}
+                  onChange={(e) => setEditPreset({ ...editPreset, name: e.target.value })}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                X en Y zijn het middelpunt van de contour · X vanaf links, Y vanaf boven · alles in mm.
+              </p>
+              <div className="space-y-3">
+                {editPreset.shapes.map((ps, i) => {
+                  const update = (patch: Partial<PresetShape>) =>
+                    setEditPreset({
+                      ...editPreset,
+                      shapes: editPreset.shapes.map((x, xi) => (xi === i ? { ...x, ...patch } : x)),
+                    });
+                  return (
+                    <div key={i} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Contour {i + 1}</span>
+                        <select
+                          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                          value={ps.type}
+                          onChange={(e) => update({ type: e.target.value as ShapeType })}
+                        >
+                          <option value="rect">Rechthoek</option>
+                          <option value="ellipse">Ellips</option>
+                        </select>
+                        <select
+                          className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                          value={ps.layer || DEFAULT_CUT_LAYER_ID}
+                          onChange={(e) => update({ layer: e.target.value })}
+                        >
+                          {layers.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.name}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="w-7 h-7 ml-auto"
+                          onClick={() =>
+                            setEditPreset({
+                              ...editPreset,
+                              shapes: editPreset.shapes.filter((_, xi) => xi !== i),
+                            })
+                          }
+                          title="Contour verwijderen"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                          <Label className="text-xs">X (midden)</Label>
+                          <MmInput
+                            value={ps.xMm + ps.wMm / 2}
+                            onCommit={(n) => update({ xMm: n - ps.wMm / 2 })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Y (midden)</Label>
+                          <MmInput
+                            value={ps.yMm + ps.hMm / 2}
+                            onCommit={(n) => update({ yMm: n - ps.hMm / 2 })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">L (breedte)</Label>
+                          <MmInput
+                            value={ps.wMm}
+                            onCommit={(n) => update({ wMm: Math.max(0, n), xMm: ps.xMm + (ps.wMm - Math.max(0, n)) / 2 })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">B (hoogte)</Label>
+                          <MmInput
+                            value={ps.hMm}
+                            onCommit={(n) => update({ hMm: Math.max(0, n), yMm: ps.yMm + (ps.hMm - Math.max(0, n)) / 2 })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setEditPreset({
+                    ...editPreset,
+                    shapes: [
+                      ...editPreset.shapes,
+                      { type: "rect", layer: activeLayerId, xMm: 0, yMm: 0, wMm: 10, hMm: 10 },
+                    ],
+                  })
+                }
+              >
+                <Plus className="w-4 h-4 mr-1" /> Contour toevoegen
+              </Button>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPreset(null)}>
+              Annuleren
+            </Button>
+            <Button onClick={saveEditedPreset} disabled={savingPreset}>
+              {savingPreset ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+              Opslaan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
