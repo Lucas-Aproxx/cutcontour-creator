@@ -8,12 +8,20 @@ export interface CutShape {
   type: ShapeType;
   /** Id van de laag waarin deze vorm hoort (zie CutLayer). */
   layer?: string;
+  /**
+   * Hulpvorm ("mal"): alleen zichtbaar in de editor om boorgaten op te
+   * positioneren. Wordt NIET meegeëxporteerd naar de PDF.
+   */
+  guide?: boolean;
+  /** Id van de mal waar deze vorm aan vasthangt (beweegt samen mee). */
+  group?: string;
   // Normalized coordinates (0..1) relative to page width/height, origin top-left
   x: number;
   y: number;
   w: number;
   h: number;
 }
+
 
 export interface CutColor {
   /** Naam van de steunkleur (separation), bv. "Cutcontour" */
