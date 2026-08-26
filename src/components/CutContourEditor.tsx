@@ -578,22 +578,33 @@ export function CutContourEditor() {
   const applyPreset = (preset: Preset) => {
     const pW = pageSize.width / PT_PER_MM;
     const pH = pageSize.height / PT_PER_MM;
+    const target = shapes.find((s) => s.id === targetGuideId && s.guide && s.page === pageIndex);
+    // Bij een mal blijven de maten op de schaal van het grote template; enkel de
+    // positie schuift mee met de linkerbovenhoek van de mal.
+    const offX = target ? target.x : 0;
+    const offY = target ? target.y : 0;
     const added: CutShape[] = preset.shapes.map((ps) => ({
       id: crypto.randomUUID(),
       page: pageIndex,
       type: ps.type,
       layer: layers.some((l) => l.id === ps.layer) ? ps.layer : activeLayerId,
+      group: target?.group,
       // Presets mogen hun exacte positie behouden, ook wanneer de gekozen
       // PDF-pagina kleiner is dan het document waarop de preset is gemaakt.
-      x: ps.xMm / pW,
-      y: ps.yMm / pH,
+      x: offX + ps.xMm / pW,
+      y: offY + ps.yMm / pH,
       w: Math.max(0, ps.wMm / pW),
       h: Math.max(0, ps.hMm / pH),
     }));
     setShapes((s) => [...s, ...added]);
     setSelectedId(added[added.length - 1]?.id ?? null);
-    toast.success(`Preset "${preset.name}" toegevoegd (${added.length} contouren)`);
+    toast.success(
+      target
+        ? `Preset "${preset.name}" op de mal geplaatst (${added.length} contouren)`
+        : `Preset "${preset.name}" toegevoegd (${added.length} contouren)`,
+    );
   };
+
 
   const deletePreset = async (id: string) => {
     const p = presets.find((x) => x.id === id);
