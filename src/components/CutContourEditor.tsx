@@ -917,7 +917,7 @@ export function CutContourEditor() {
                 <canvas ref={canvasRef} className="block" />
                 <div
                   ref={overlayRef}
-                  className="absolute inset-0 cursor-crosshair"
+                  className={dragging ? "absolute inset-0 cursor-grabbing" : "absolute inset-0 cursor-crosshair"}
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
@@ -925,17 +925,19 @@ export function CutContourEditor() {
                   {pageShapes.map((s) => (
                     <div
                       key={s.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedId(s.id);
-                      }}
-                      className="absolute border-2"
+                      className={s.guide ? "absolute border-2 border-dashed" : "absolute border-2"}
                       style={{
+                        pointerEvents: "none",
                         left: s.x * 100 + "%",
                         top: s.y * 100 + "%",
                         width: s.w * 100 + "%",
                         height: s.h * 100 + "%",
-                        borderColor: selectedId === s.id ? "oklch(0.7 0.3 30)" : colorOfLayer(layerOf(s)),
+                        borderColor: selectedId === s.id
+                          ? "oklch(0.7 0.3 30)"
+                          : s.guide
+                            ? "oklch(0.6 0.02 260)"
+                            : colorOfLayer(layerOf(s)),
+                        background: s.guide ? "oklch(0.6 0.02 260 / 0.08)" : undefined,
                         borderRadius: s.type === "ellipse" ? "50%" : 0,
                         boxShadow: selectedId === s.id ? "0 0 0 2px oklch(0.7 0.3 30 / 0.3)" : undefined,
                       }}
@@ -946,7 +948,7 @@ export function CutContourEditor() {
                       className="absolute border-2 border-dashed pointer-events-none"
                       style={{
                         ...rectPreview,
-                        borderColor: colorOfLayer(activeLayerId),
+                        borderColor: malMode ? "oklch(0.6 0.02 260)" : colorOfLayer(activeLayerId),
                         borderRadius: tool === "ellipse" ? "50%" : 0,
                       }}
                     />
@@ -954,8 +956,11 @@ export function CutContourEditor() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-3">
-                Teken op de pagina of gebruik een preset. Klik een contour om exacte afmetingen in mm in te stellen.
+                Teken op de pagina, sleep een vorm om te verplaatsen of gebruik een preset. Klik een contour om exacte
+                afmetingen in mm in te stellen. Een <strong>mal</strong> (stippellijn) is enkel een hulpvorm: sleep je de
+                mal, dan bewegen de boorgaten die erop staan mee. De mal zelf wordt nooit meegeëxporteerd.
               </p>
+
             </Card>
           )}
         </section>
