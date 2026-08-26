@@ -86,6 +86,13 @@ export function CutContourEditor() {
   const [shapes, setShapes] = useState<CutShape[]>([]);
   const [tool, setTool] = useState<ShapeType>("rect");
   const [drawing, setDrawing] = useState<null | { startX: number; startY: number; curX: number; curY: number }>(null);
+  const [malMode, setMalMode] = useState(false);
+  const [dragging, setDragging] = useState<null | {
+    ids: string[];
+    startX: number;
+    startY: number;
+    origin: Record<string, { x: number; y: number }>;
+  }>(null);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
