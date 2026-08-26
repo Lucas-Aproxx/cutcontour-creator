@@ -70,6 +70,20 @@ function Dashboard() {
             </div>
           </Card>
         </Link>
+
+        <Link to="/app/crop" className="group">
+          <Card className="h-64 flex flex-col items-center justify-center gap-4 p-6 text-center transition-all hover:shadow-lg hover:border-primary/50 hover:-translate-y-1">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <Crop className="w-8 h-8 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold">PDF bijsnijden</h2>
+              <p className="text-muted-foreground mt-1 max-w-[260px]">
+                Snijd een bestand centraal bij naar een exact formaat in millimeter.
+              </p>
+            </div>
+          </Card>
+        </Link>
       </div>
     </div>
   );
