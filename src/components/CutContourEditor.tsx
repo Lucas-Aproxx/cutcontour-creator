@@ -315,9 +315,26 @@ export function CutContourEditor() {
 
   const updateSelectedMm = (patch: { xMm?: number; yMm?: number; wMm?: number; hMm?: number }) => {
     if (!selected) return;
+    const size0 = pageSizesPt[selected.page] ?? pageSize;
+    const pW0 = size0.width / PT_PER_MM;
+    const pH0 = size0.height / PT_PER_MM;
+    let shiftX = 0;
+    let shiftY = 0;
+    if (selected.guide) {
+      const curW = selected.w * pW0;
+      const curH = selected.h * pH0;
+      shiftX = ((patch.xMm ?? selected.x * pW0 + curW / 2) - (selected.x * pW0 + curW / 2)) / pW0;
+      shiftY = ((patch.yMm ?? selected.y * pH0 + curH / 2) - (selected.y * pH0 + curH / 2)) / pH0;
+    }
     setShapes((all) =>
       all.map((s) => {
-        if (s.id !== selected.id) return s;
+        if (s.id !== selected.id) {
+          // Vormen op de mal schuiven mee als de mal verplaatst wordt.
+          if (selected.guide && selected.group && s.group === selected.group && (shiftX || shiftY)) {
+            return { ...s, x: s.x + shiftX, y: s.y + shiftY };
+          }
+          return s;
+        }
         const size = pageSizesPt[s.page] ?? pageSize;
         const pW = size.width / PT_PER_MM;
         const pH = size.height / PT_PER_MM;
@@ -346,6 +363,7 @@ export function CutContourEditor() {
       }),
     );
   };
+
 
   const handleExport = async () => {
     if (!fileBytes) return;
