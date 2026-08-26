@@ -422,7 +422,7 @@ export function CutContourEditor() {
         const size = pageSizesPt[i] ?? { width: vp.width / SCALE, height: vp.height / SCALE };
         const pWmm = size.width / PT_PER_MM;
         const pHmm = size.height / PT_PER_MM;
-        const pageContours = shapes.filter((s) => s.page === i);
+        const pageContours = shapes.filter((s) => s.page === i && !s.guide);
 
         // Draw contours + labels
         ctx.lineWidth = 2;
