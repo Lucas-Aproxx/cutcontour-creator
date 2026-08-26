@@ -860,7 +860,7 @@ export function CutContourEditor() {
           ) : (
             <Card className="p-4">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     variant={tool === "rect" ? "default" : "outline"}
                     size="sm"
@@ -875,7 +875,16 @@ export function CutContourEditor() {
                   >
                     <Circle className="w-4 h-4 mr-1" /> Ellips
                   </Button>
+                  <Button
+                    variant={malMode ? "default" : "secondary"}
+                    size="sm"
+                    onClick={() => setMalMode((v) => !v)}
+                    title="Teken een hulpvorm (mal) om boorgaten op te positioneren — wordt niet meegeëxporteerd"
+                  >
+                    <Move className="w-4 h-4 mr-1" /> {malMode ? "Mal tekenen…" : "Mal toevoegen"}
+                  </Button>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
                     Pagina {Math.round(pageWmm)}×{Math.round(pageHmm)} mm
