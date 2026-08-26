@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { migrateLocalData } from "@/lib/data";
-import { PenTool, Users } from "lucide-react";
+import { Crop, PenTool, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/")({
   component: Dashboard,
@@ -42,7 +42,7 @@ function Dashboard() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-6">
-      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link to="/app/editor" className="group">
           <Card className="h-64 flex flex-col items-center justify-center gap-4 p-6 text-center transition-all hover:shadow-lg hover:border-primary/50 hover:-translate-y-1">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -66,6 +66,20 @@ function Dashboard() {
               <h2 className="text-2xl font-semibold">CRM</h2>
               <p className="text-muted-foreground mt-1 max-w-[260px]">
                 Beheer contacten, mappen, statussen en je eigen velden.
+              </p>
+            </div>
+          </Card>
+        </Link>
+
+        <Link to="/app/crop" className="group">
+          <Card className="h-64 flex flex-col items-center justify-center gap-4 p-6 text-center transition-all hover:shadow-lg hover:border-primary/50 hover:-translate-y-1">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <Crop className="w-8 h-8 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold">PDF bijsnijden</h2>
+              <p className="text-muted-foreground mt-1 max-w-[260px]">
+                Snijd een bestand centraal bij naar een exact formaat in millimeter.
               </p>
             </div>
           </Card>

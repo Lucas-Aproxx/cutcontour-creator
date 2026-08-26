@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as AuthenticatedAppEditorRouteImport } from './routes/_authenticated/app.editor'
+import { Route as AuthenticatedAppCropRouteImport } from './routes/_authenticated/app.crop'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
 
 const AuthRoute = AuthRouteImport.update({
@@ -46,6 +47,11 @@ const AuthenticatedAppEditorRoute = AuthenticatedAppEditorRouteImport.update({
   path: '/editor',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppCropRoute = AuthenticatedAppCropRouteImport.update({
+  id: '/crop',
+  path: '/crop',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
 const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
   id: '/crm',
   path: '/crm',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/crop': typeof AuthenticatedAppCropRoute
   '/app/editor': typeof AuthenticatedAppEditorRoute
   '/app/': typeof AuthenticatedAppIndexRoute
 }
@@ -64,6 +71,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/crop': typeof AuthenticatedAppCropRoute
   '/app/editor': typeof AuthenticatedAppEditorRoute
   '/app': typeof AuthenticatedAppIndexRoute
 }
@@ -74,14 +82,22 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
+  '/_authenticated/app/crop': typeof AuthenticatedAppCropRoute
   '/_authenticated/app/editor': typeof AuthenticatedAppEditorRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/app' | '/app/crm' | '/app/editor' | '/app/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/app'
+    | '/app/crm'
+    | '/app/crop'
+    | '/app/editor'
+    | '/app/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/app/crm' | '/app/editor' | '/app'
+  to: '/' | '/auth' | '/app/crm' | '/app/crop' | '/app/editor' | '/app'
   id:
     | '__root__'
     | '/'
@@ -89,6 +105,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/app'
     | '/_authenticated/app/crm'
+    | '/_authenticated/app/crop'
     | '/_authenticated/app/editor'
     | '/_authenticated/app/'
   fileRoutesById: FileRoutesById
@@ -143,6 +160,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEditorRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/crop': {
+      id: '/_authenticated/app/crop'
+      path: '/crop'
+      fullPath: '/app/crop'
+      preLoaderRoute: typeof AuthenticatedAppCropRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/crm': {
       id: '/_authenticated/app/crm'
       path: '/crm'
@@ -155,12 +179,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
+  AuthenticatedAppCropRoute: typeof AuthenticatedAppCropRoute
   AuthenticatedAppEditorRoute: typeof AuthenticatedAppEditorRoute
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
+  AuthenticatedAppCropRoute: AuthenticatedAppCropRoute,
   AuthenticatedAppEditorRoute: AuthenticatedAppEditorRoute,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
 }
