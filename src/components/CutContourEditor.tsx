@@ -1042,8 +1042,16 @@ export function CutContourEditor() {
               <div className="flex items-center gap-2">
                 {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
                 <h2 className="font-semibold">Afmetingen (mm)</h2>
+                {selected.guide && <Badge variant="secondary">Mal</Badge>}
                 <span className="ml-auto text-[10px] text-muted-foreground">X = midden vanaf links · Y = midden vanaf bovenkant</span>
               </div>
+              {selected.guide && (
+                <p className="text-xs text-muted-foreground">
+                  Hulpvorm met {shapes.filter((s) => s.group === selected.group && s.id !== selected.id).length}{" "}
+                  boorgat(en) erop. Verplaats de mal (slepen of X/Y aanpassen) en de boorgaten volgen mee. De mal wordt
+                  niet meegeëxporteerd.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">X (midden)</Label>
@@ -1062,23 +1070,38 @@ export function CutContourEditor() {
                   <MmInput value={selHmm} onCommit={(n) => updateSelectedMm({ hMm: n })} />
                 </div>
               </div>
-              <div>
-                <Label className="text-xs">Laag</Label>
-                <select
-                  className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
-                  value={layerOf(selected)}
-                  onChange={(e) => {
-                    const lid = e.target.value;
-                    setShapes((all) => all.map((s) => (s.id === selected.id ? { ...s, layer: lid } : s)));
+              {selected.guide ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setShapes((all) => all.filter((s) => s.id !== selected.id));
+                    setSelectedId(null);
+                    toast.success("Mal verwijderd — de boorgaten blijven staan");
                   }}
                 >
-                  {layers.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <Trash2 className="w-4 h-4 mr-1" /> Mal verwijderen (boorgaten blijven)
+                </Button>
+              ) : (
+                <div>
+                  <Label className="text-xs">Laag</Label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    value={layerOf(selected)}
+                    onChange={(e) => {
+                      const lid = e.target.value;
+                      setShapes((all) => all.map((s) => (s.id === selected.id ? { ...s, layer: lid } : s)));
+                    }}
+                  >
+                    {layers.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-1">
                 <Input
                   placeholder="Preset naam..."
