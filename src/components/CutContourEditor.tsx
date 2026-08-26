@@ -15,7 +15,7 @@ import {
   type CutShape,
   type ShapeType,
 } from "@/lib/cutcontour";
-import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check, Search, Pencil, X } from "lucide-react";
+import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check, Search, Pencil, X, Move } from "lucide-react";
 import {
   Dialog,
   DialogContent,
