@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { migrateLocalData } from "@/lib/data";
-import { PenTool, Users } from "lucide-react";
+import { Crop, PenTool, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/")({
   component: Dashboard,
