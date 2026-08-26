@@ -42,7 +42,7 @@ function Dashboard() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-6">
-      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6">
         <Link to="/app/editor" className="group">
           <Card className="h-64 flex flex-col items-center justify-center gap-4 p-6 text-center transition-all hover:shadow-lg hover:border-primary/50 hover:-translate-y-1">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
