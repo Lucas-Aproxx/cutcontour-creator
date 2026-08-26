@@ -87,6 +87,8 @@ export function CutContourEditor() {
   const [tool, setTool] = useState<ShapeType>("rect");
   const [drawing, setDrawing] = useState<null | { startX: number; startY: number; curX: number; curY: number }>(null);
   const [malMode, setMalMode] = useState(false);
+  /** Doelvlak voor nieuwe boorgaten/presets: null = groot template, anders mal-id. */
+  const [targetGuideId, setTargetGuideId] = useState<string | null>(null);
   const [dragging, setDragging] = useState<null | {
     ids: string[];
     startX: number;
