@@ -546,12 +546,13 @@ export function CutContourEditor() {
   };
 
   const saveCurrentPageAsPreset = async () => {
-    if (pageShapes.length === 0) {
+    const savable = pageShapes.filter((s) => !s.guide);
+    if (savable.length === 0) {
       toast.error("Geen contouren op deze pagina om op te slaan");
       return;
     }
-    const name = newPresetName.trim() || `Preset ${presets.length + 1} (${pageShapes.length} contouren)`;
-    const shapes: PresetShape[] = pageShapes.map((s) => {
+    const name = newPresetName.trim() || `Preset ${presets.length + 1} (${savable.length} contouren)`;
+    const shapes: PresetShape[] = savable.map((s) => {
       const size = pageSizesPt[s.page] ?? pageSize;
       const pW = size.width / PT_PER_MM;
       const pH = size.height / PT_PER_MM;
