@@ -901,7 +901,34 @@ export function CutContourEditor() {
                   >
                     <Move className="w-4 h-4 mr-1" /> {malMode ? "Mal tekenen…" : "Mal toevoegen"}
                   </Button>
+                  {pageShapes.some((s) => s.guide) && (
+                    <div className="flex items-center gap-1 flex-wrap pl-2 border-l">
+                      <span className="text-xs text-muted-foreground mr-1">Boorgaten op:</span>
+                      <Button
+                        variant={targetGuideId === null ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTargetGuideId(null)}
+                        title="Nieuwe boorgaten/presets komen op het grote template"
+                      >
+                        Template
+                      </Button>
+                      {pageShapes
+                        .filter((s) => s.guide)
+                        .map((g, i) => (
+                          <Button
+                            key={g.id}
+                            variant={targetGuideId === g.id ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setTargetGuideId(g.id)}
+                            title="Nieuwe boorgaten/presets hangen aan deze mal en bewegen mee"
+                          >
+                            Mal {i + 1}
+                          </Button>
+                        ))}
+                    </div>
+                  )}
                 </div>
+
 
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
