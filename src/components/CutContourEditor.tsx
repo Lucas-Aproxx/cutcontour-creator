@@ -87,6 +87,8 @@ export function CutContourEditor() {
   const [tool, setTool] = useState<ShapeType>("rect");
   const [drawing, setDrawing] = useState<null | { startX: number; startY: number; curX: number; curY: number }>(null);
   const [malMode, setMalMode] = useState(false);
+  /** Doelvlak voor nieuwe boorgaten/presets: null = groot template, anders mal-id. */
+  const [targetGuideId, setTargetGuideId] = useState<string | null>(null);
   const [dragging, setDragging] = useState<null | {
     ids: string[];
     startX: number;
@@ -288,21 +290,26 @@ export function CutContourEditor() {
       ]);
       setSelectedId(id);
       setMalMode(false);
+      setTargetGuideId(id);
       toast.success("Mal toegevoegd — plaats nu je boorgaten erop");
       return;
     }
-    // Hangt de nieuwe contour op een mal? Dan beweegt hij mee met die mal.
+    // Doelvlak: expliciet gekozen mal, anders de mal waar de vorm in valt.
     const cx = x + w / 2;
     const cy = y + h / 2;
-    const guide = shapes
-      .filter((s) => s.guide && s.page === pageIndex)
-      .find((s) => cx >= s.x && cx <= s.x + s.w && cy >= s.y && cy <= s.y + s.h);
+    const chosen = shapes.find((s) => s.id === targetGuideId && s.guide && s.page === pageIndex);
+    const guide =
+      chosen ??
+      shapes
+        .filter((s) => s.guide && s.page === pageIndex)
+        .find((s) => cx >= s.x && cx <= s.x + s.w && cy >= s.y && cy <= s.y + s.h);
     setShapes((s) => [
       ...s,
       { id, page: pageIndex, type: tool, layer: activeLayerId, group: guide?.group, x, y, w, h },
     ]);
     setSelectedId(id);
   };
+
 
 
   const pageShapes = shapes.filter((s) => s.page === pageIndex);
@@ -571,22 +578,33 @@ export function CutContourEditor() {
   const applyPreset = (preset: Preset) => {
     const pW = pageSize.width / PT_PER_MM;
     const pH = pageSize.height / PT_PER_MM;
+    const target = shapes.find((s) => s.id === targetGuideId && s.guide && s.page === pageIndex);
+    // Bij een mal blijven de maten op de schaal van het grote template; enkel de
+    // positie schuift mee met de linkerbovenhoek van de mal.
+    const offX = target ? target.x : 0;
+    const offY = target ? target.y : 0;
     const added: CutShape[] = preset.shapes.map((ps) => ({
       id: crypto.randomUUID(),
       page: pageIndex,
       type: ps.type,
       layer: layers.some((l) => l.id === ps.layer) ? ps.layer : activeLayerId,
+      group: target?.group,
       // Presets mogen hun exacte positie behouden, ook wanneer de gekozen
       // PDF-pagina kleiner is dan het document waarop de preset is gemaakt.
-      x: ps.xMm / pW,
-      y: ps.yMm / pH,
+      x: offX + ps.xMm / pW,
+      y: offY + ps.yMm / pH,
       w: Math.max(0, ps.wMm / pW),
       h: Math.max(0, ps.hMm / pH),
     }));
     setShapes((s) => [...s, ...added]);
     setSelectedId(added[added.length - 1]?.id ?? null);
-    toast.success(`Preset "${preset.name}" toegevoegd (${added.length} contouren)`);
+    toast.success(
+      target
+        ? `Preset "${preset.name}" op de mal geplaatst (${added.length} contouren)`
+        : `Preset "${preset.name}" toegevoegd (${added.length} contouren)`,
+    );
   };
+
 
   const deletePreset = async (id: string) => {
     const p = presets.find((x) => x.id === id);
@@ -883,7 +901,34 @@ export function CutContourEditor() {
                   >
                     <Move className="w-4 h-4 mr-1" /> {malMode ? "Mal tekenen…" : "Mal toevoegen"}
                   </Button>
+                  {pageShapes.some((s) => s.guide) && (
+                    <div className="flex items-center gap-1 flex-wrap pl-2 border-l">
+                      <span className="text-xs text-muted-foreground mr-1">Boorgaten op:</span>
+                      <Button
+                        variant={targetGuideId === null ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setTargetGuideId(null)}
+                        title="Nieuwe boorgaten/presets komen op het grote template"
+                      >
+                        Template
+                      </Button>
+                      {pageShapes
+                        .filter((s) => s.guide)
+                        .map((g, i) => (
+                          <Button
+                            key={g.id}
+                            variant={targetGuideId === g.id ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setTargetGuideId(g.id)}
+                            title="Nieuwe boorgaten/presets hangen aan deze mal en bewegen mee"
+                          >
+                            Mal {i + 1}
+                          </Button>
+                        ))}
+                    </div>
+                  )}
                 </div>
+
 
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
