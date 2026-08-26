@@ -8,12 +8,20 @@ export interface CutShape {
   type: ShapeType;
   /** Id van de laag waarin deze vorm hoort (zie CutLayer). */
   layer?: string;
+  /**
+   * Hulpvorm ("mal"): alleen zichtbaar in de editor om boorgaten op te
+   * positioneren. Wordt NIET meegeëxporteerd naar de PDF.
+   */
+  guide?: boolean;
+  /** Id van de mal waar deze vorm aan vasthangt (beweegt samen mee). */
+  group?: string;
   // Normalized coordinates (0..1) relative to page width/height, origin top-left
   x: number;
   y: number;
   w: number;
   h: number;
 }
+
 
 export interface CutColor {
   /** Naam van de steunkleur (separation), bv. "Cutcontour" */
@@ -75,9 +83,13 @@ export async function addCutContour(
   const pages = pdfDoc.getPages();
   const catalog = pdfDoc.catalog;
 
+  // Mal-hulpvormen worden nooit geëxporteerd.
+  shapes = shapes.filter((s) => !s.guide);
+
   const usedLayerIds = new Set(shapes.map((s) => s.layer || DEFAULT_CUT_LAYER_ID));
   const activeLayers = layers.filter((l) => usedLayerIds.has(l.id));
   if (activeLayers.length === 0) return await pdfDoc.save();
+
 
   // Per laag: separation colorspace + OCG (één keer per document)
   const sepRefs = new Map<string, PDFRef>();

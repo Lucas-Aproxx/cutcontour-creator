@@ -15,7 +15,7 @@ import {
   type CutShape,
   type ShapeType,
 } from "@/lib/cutcontour";
-import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check, Search, Pencil, X } from "lucide-react";
+import { Trash2, Square, Circle, Upload, Download, ChevronLeft, ChevronRight, Layers, Save, Plus, Ruler, Loader2, Check, Search, Pencil, X, Move } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -86,6 +86,13 @@ export function CutContourEditor() {
   const [shapes, setShapes] = useState<CutShape[]>([]);
   const [tool, setTool] = useState<ShapeType>("rect");
   const [drawing, setDrawing] = useState<null | { startX: number; startY: number; curX: number; curY: number }>(null);
+  const [malMode, setMalMode] = useState(false);
+  const [dragging, setDragging] = useState<null | {
+    ids: string[];
+    startX: number;
+    startY: number;
+    origin: Record<string, { x: number; y: number }>;
+  }>(null);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
@@ -205,18 +212,67 @@ export function CutContourEditor() {
     return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
   };
 
+  const hitTest = (list: CutShape[], x: number, y: number): CutShape | null => {
+    const inside = (s: CutShape) => {
+      if (x < s.x || x > s.x + s.w || y < s.y || y > s.y + s.h) return false;
+      if (s.type === "ellipse") {
+        const nx = (x - (s.x + s.w / 2)) / (s.w / 2 || 1);
+        const ny = (y - (s.y + s.h / 2)) / (s.h / 2 || 1);
+        return nx * nx + ny * ny <= 1;
+      }
+      return true;
+    };
+    // Contouren liggen bovenop de mal, zodat boorgaten los te slepen zijn.
+    const normal = [...list].reverse().find((s) => !s.guide && inside(s));
+    if (normal) return normal;
+    return [...list].reverse().find((s) => s.guide && inside(s)) ?? null;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (!pdfDoc) return;
     (e.target as Element).setPointerCapture(e.pointerId);
     const { x, y } = getPos(e);
+    const hit = hitTest(shapes.filter((s) => s.page === pageIndex), x, y);
+    if (hit) {
+      setSelectedId(hit.id);
+      // Bij een mal slepen alle vormen die eraan vasthangen mee.
+      const ids = hit.guide && hit.group
+        ? shapes.filter((s) => s.id === hit.id || s.group === hit.group).map((s) => s.id)
+        : [hit.id];
+      setDragging({
+        ids,
+        startX: x,
+        startY: y,
+        origin: Object.fromEntries(
+          shapes.filter((s) => ids.includes(s.id)).map((s) => [s.id, { x: s.x, y: s.y }]),
+        ),
+      });
+      return;
+    }
     setDrawing({ startX: x, startY: y, curX: x, curY: y });
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    if (dragging) {
+      const { x, y } = getPos(e);
+      const dx = x - dragging.startX;
+      const dy = y - dragging.startY;
+      setShapes((all) =>
+        all.map((s) => {
+          const o = dragging.origin[s.id];
+          return o ? { ...s, x: o.x + dx, y: o.y + dy } : s;
+        }),
+      );
+      return;
+    }
     if (!drawing) return;
     const { x, y } = getPos(e);
     setDrawing({ ...drawing, curX: x, curY: y });
   };
   const onPointerUp = () => {
+    if (dragging) {
+      setDragging(null);
+      return;
+    }
     if (!drawing) return;
     const x = Math.min(drawing.startX, drawing.curX);
     const y = Math.min(drawing.startY, drawing.curY);
@@ -225,9 +281,29 @@ export function CutContourEditor() {
     setDrawing(null);
     if (w < 0.005 || h < 0.005) return;
     const id = crypto.randomUUID();
-    setShapes((s) => [...s, { id, page: pageIndex, type: tool, layer: activeLayerId, x, y, w, h }]);
+    if (malMode) {
+      setShapes((s) => [
+        ...s,
+        { id, page: pageIndex, type: tool, guide: true, group: id, x, y, w, h },
+      ]);
+      setSelectedId(id);
+      setMalMode(false);
+      toast.success("Mal toegevoegd — plaats nu je boorgaten erop");
+      return;
+    }
+    // Hangt de nieuwe contour op een mal? Dan beweegt hij mee met die mal.
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const guide = shapes
+      .filter((s) => s.guide && s.page === pageIndex)
+      .find((s) => cx >= s.x && cx <= s.x + s.w && cy >= s.y && cy <= s.y + s.h);
+    setShapes((s) => [
+      ...s,
+      { id, page: pageIndex, type: tool, layer: activeLayerId, group: guide?.group, x, y, w, h },
+    ]);
     setSelectedId(id);
   };
+
 
   const pageShapes = shapes.filter((s) => s.page === pageIndex);
   const selected = shapes.find((s) => s.id === selectedId) ?? null;
@@ -239,9 +315,26 @@ export function CutContourEditor() {
 
   const updateSelectedMm = (patch: { xMm?: number; yMm?: number; wMm?: number; hMm?: number }) => {
     if (!selected) return;
+    const size0 = pageSizesPt[selected.page] ?? pageSize;
+    const pW0 = size0.width / PT_PER_MM;
+    const pH0 = size0.height / PT_PER_MM;
+    let shiftX = 0;
+    let shiftY = 0;
+    if (selected.guide) {
+      const curW = selected.w * pW0;
+      const curH = selected.h * pH0;
+      shiftX = ((patch.xMm ?? selected.x * pW0 + curW / 2) - (selected.x * pW0 + curW / 2)) / pW0;
+      shiftY = ((patch.yMm ?? selected.y * pH0 + curH / 2) - (selected.y * pH0 + curH / 2)) / pH0;
+    }
     setShapes((all) =>
       all.map((s) => {
-        if (s.id !== selected.id) return s;
+        if (s.id !== selected.id) {
+          // Vormen op de mal schuiven mee als de mal verplaatst wordt.
+          if (selected.guide && selected.group && s.group === selected.group && (shiftX || shiftY)) {
+            return { ...s, x: s.x + shiftX, y: s.y + shiftY };
+          }
+          return s;
+        }
         const size = pageSizesPt[s.page] ?? pageSize;
         const pW = size.width / PT_PER_MM;
         const pH = size.height / PT_PER_MM;
@@ -270,6 +363,7 @@ export function CutContourEditor() {
       }),
     );
   };
+
 
   const handleExport = async () => {
     if (!fileBytes) return;
@@ -328,7 +422,7 @@ export function CutContourEditor() {
         const size = pageSizesPt[i] ?? { width: vp.width / SCALE, height: vp.height / SCALE };
         const pWmm = size.width / PT_PER_MM;
         const pHmm = size.height / PT_PER_MM;
-        const pageContours = shapes.filter((s) => s.page === i);
+        const pageContours = shapes.filter((s) => s.page === i && !s.guide);
 
         // Draw contours + labels
         ctx.lineWidth = 2;
@@ -452,12 +546,13 @@ export function CutContourEditor() {
   };
 
   const saveCurrentPageAsPreset = async () => {
-    if (pageShapes.length === 0) {
+    const savable = pageShapes.filter((s) => !s.guide);
+    if (savable.length === 0) {
       toast.error("Geen contouren op deze pagina om op te slaan");
       return;
     }
-    const name = newPresetName.trim() || `Preset ${presets.length + 1} (${pageShapes.length} contouren)`;
-    const shapes: PresetShape[] = pageShapes.map((s) => {
+    const name = newPresetName.trim() || `Preset ${presets.length + 1} (${savable.length} contouren)`;
+    const shapes: PresetShape[] = savable.map((s) => {
       const size = pageSizesPt[s.page] ?? pageSize;
       const pW = size.width / PT_PER_MM;
       const pH = size.height / PT_PER_MM;
@@ -765,7 +860,7 @@ export function CutContourEditor() {
           ) : (
             <Card className="p-4">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     variant={tool === "rect" ? "default" : "outline"}
                     size="sm"
@@ -780,7 +875,16 @@ export function CutContourEditor() {
                   >
                     <Circle className="w-4 h-4 mr-1" /> Ellips
                   </Button>
+                  <Button
+                    variant={malMode ? "default" : "secondary"}
+                    size="sm"
+                    onClick={() => setMalMode((v) => !v)}
+                    title="Teken een hulpvorm (mal) om boorgaten op te positioneren — wordt niet meegeëxporteerd"
+                  >
+                    <Move className="w-4 h-4 mr-1" /> {malMode ? "Mal tekenen…" : "Mal toevoegen"}
+                  </Button>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
                     Pagina {Math.round(pageWmm)}×{Math.round(pageHmm)} mm
@@ -813,7 +917,7 @@ export function CutContourEditor() {
                 <canvas ref={canvasRef} className="block" />
                 <div
                   ref={overlayRef}
-                  className="absolute inset-0 cursor-crosshair"
+                  className={dragging ? "absolute inset-0 cursor-grabbing" : "absolute inset-0 cursor-crosshair"}
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
@@ -821,17 +925,19 @@ export function CutContourEditor() {
                   {pageShapes.map((s) => (
                     <div
                       key={s.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedId(s.id);
-                      }}
-                      className="absolute border-2"
+                      className={s.guide ? "absolute border-2 border-dashed" : "absolute border-2"}
                       style={{
+                        pointerEvents: "none",
                         left: s.x * 100 + "%",
                         top: s.y * 100 + "%",
                         width: s.w * 100 + "%",
                         height: s.h * 100 + "%",
-                        borderColor: selectedId === s.id ? "oklch(0.7 0.3 30)" : colorOfLayer(layerOf(s)),
+                        borderColor: selectedId === s.id
+                          ? "oklch(0.7 0.3 30)"
+                          : s.guide
+                            ? "oklch(0.6 0.02 260)"
+                            : colorOfLayer(layerOf(s)),
+                        background: s.guide ? "oklch(0.6 0.02 260 / 0.08)" : undefined,
                         borderRadius: s.type === "ellipse" ? "50%" : 0,
                         boxShadow: selectedId === s.id ? "0 0 0 2px oklch(0.7 0.3 30 / 0.3)" : undefined,
                       }}
@@ -842,7 +948,7 @@ export function CutContourEditor() {
                       className="absolute border-2 border-dashed pointer-events-none"
                       style={{
                         ...rectPreview,
-                        borderColor: colorOfLayer(activeLayerId),
+                        borderColor: malMode ? "oklch(0.6 0.02 260)" : colorOfLayer(activeLayerId),
                         borderRadius: tool === "ellipse" ? "50%" : 0,
                       }}
                     />
@@ -850,8 +956,11 @@ export function CutContourEditor() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-3">
-                Teken op de pagina of gebruik een preset. Klik een contour om exacte afmetingen in mm in te stellen.
+                Teken op de pagina, sleep een vorm om te verplaatsen of gebruik een preset. Klik een contour om exacte
+                afmetingen in mm in te stellen. Een <strong>mal</strong> (stippellijn) is enkel een hulpvorm: sleep je de
+                mal, dan bewegen de boorgaten die erop staan mee. De mal zelf wordt nooit meegeëxporteerd.
               </p>
+
             </Card>
           )}
         </section>
@@ -933,8 +1042,16 @@ export function CutContourEditor() {
               <div className="flex items-center gap-2">
                 {selected.type === "rect" ? <Square className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4 text-primary" />}
                 <h2 className="font-semibold">Afmetingen (mm)</h2>
+                {selected.guide && <Badge variant="secondary">Mal</Badge>}
                 <span className="ml-auto text-[10px] text-muted-foreground">X = midden vanaf links · Y = midden vanaf bovenkant</span>
               </div>
+              {selected.guide && (
+                <p className="text-xs text-muted-foreground">
+                  Hulpvorm met {shapes.filter((s) => s.group === selected.group && s.id !== selected.id).length}{" "}
+                  boorgat(en) erop. Verplaats de mal (slepen of X/Y aanpassen) en de boorgaten volgen mee. De mal wordt
+                  niet meegeëxporteerd.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">X (midden)</Label>
@@ -953,23 +1070,38 @@ export function CutContourEditor() {
                   <MmInput value={selHmm} onCommit={(n) => updateSelectedMm({ hMm: n })} />
                 </div>
               </div>
-              <div>
-                <Label className="text-xs">Laag</Label>
-                <select
-                  className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
-                  value={layerOf(selected)}
-                  onChange={(e) => {
-                    const lid = e.target.value;
-                    setShapes((all) => all.map((s) => (s.id === selected.id ? { ...s, layer: lid } : s)));
+              {selected.guide ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setShapes((all) => all.filter((s) => s.id !== selected.id));
+                    setSelectedId(null);
+                    toast.success("Mal verwijderd — de boorgaten blijven staan");
                   }}
                 >
-                  {layers.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <Trash2 className="w-4 h-4 mr-1" /> Mal verwijderen (boorgaten blijven)
+                </Button>
+              ) : (
+                <div>
+                  <Label className="text-xs">Laag</Label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    value={layerOf(selected)}
+                    onChange={(e) => {
+                      const lid = e.target.value;
+                      setShapes((all) => all.map((s) => (s.id === selected.id ? { ...s, layer: lid } : s)));
+                    }}
+                  >
+                    {layers.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-1">
                 <Input
                   placeholder="Preset naam..."
