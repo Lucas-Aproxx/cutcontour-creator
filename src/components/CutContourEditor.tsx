@@ -290,21 +290,26 @@ export function CutContourEditor() {
       ]);
       setSelectedId(id);
       setMalMode(false);
+      setTargetGuideId(id);
       toast.success("Mal toegevoegd — plaats nu je boorgaten erop");
       return;
     }
-    // Hangt de nieuwe contour op een mal? Dan beweegt hij mee met die mal.
+    // Doelvlak: expliciet gekozen mal, anders de mal waar de vorm in valt.
     const cx = x + w / 2;
     const cy = y + h / 2;
-    const guide = shapes
-      .filter((s) => s.guide && s.page === pageIndex)
-      .find((s) => cx >= s.x && cx <= s.x + s.w && cy >= s.y && cy <= s.y + s.h);
+    const chosen = shapes.find((s) => s.id === targetGuideId && s.guide && s.page === pageIndex);
+    const guide =
+      chosen ??
+      shapes
+        .filter((s) => s.guide && s.page === pageIndex)
+        .find((s) => cx >= s.x && cx <= s.x + s.w && cy >= s.y && cy <= s.y + s.h);
     setShapes((s) => [
       ...s,
       { id, page: pageIndex, type: tool, layer: activeLayerId, group: guide?.group, x, y, w, h },
     ]);
     setSelectedId(id);
   };
+
 
 
   const pageShapes = shapes.filter((s) => s.page === pageIndex);
