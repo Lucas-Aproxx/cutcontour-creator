@@ -205,18 +205,67 @@ export function CutContourEditor() {
     return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
   };
 
+  const hitTest = (list: CutShape[], x: number, y: number): CutShape | null => {
+    const inside = (s: CutShape) => {
+      if (x < s.x || x > s.x + s.w || y < s.y || y > s.y + s.h) return false;
+      if (s.type === "ellipse") {
+        const nx = (x - (s.x + s.w / 2)) / (s.w / 2 || 1);
+        const ny = (y - (s.y + s.h / 2)) / (s.h / 2 || 1);
+        return nx * nx + ny * ny <= 1;
+      }
+      return true;
+    };
+    // Contouren liggen bovenop de mal, zodat boorgaten los te slepen zijn.
+    const normal = [...list].reverse().find((s) => !s.guide && inside(s));
+    if (normal) return normal;
+    return [...list].reverse().find((s) => s.guide && inside(s)) ?? null;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (!pdfDoc) return;
     (e.target as Element).setPointerCapture(e.pointerId);
     const { x, y } = getPos(e);
+    const hit = hitTest(shapes.filter((s) => s.page === pageIndex), x, y);
+    if (hit) {
+      setSelectedId(hit.id);
+      // Bij een mal slepen alle vormen die eraan vasthangen mee.
+      const ids = hit.guide && hit.group
+        ? shapes.filter((s) => s.id === hit.id || s.group === hit.group).map((s) => s.id)
+        : [hit.id];
+      setDragging({
+        ids,
+        startX: x,
+        startY: y,
+        origin: Object.fromEntries(
+          shapes.filter((s) => ids.includes(s.id)).map((s) => [s.id, { x: s.x, y: s.y }]),
+        ),
+      });
+      return;
+    }
     setDrawing({ startX: x, startY: y, curX: x, curY: y });
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    if (dragging) {
+      const { x, y } = getPos(e);
+      const dx = x - dragging.startX;
+      const dy = y - dragging.startY;
+      setShapes((all) =>
+        all.map((s) => {
+          const o = dragging.origin[s.id];
+          return o ? { ...s, x: o.x + dx, y: o.y + dy } : s;
+        }),
+      );
+      return;
+    }
     if (!drawing) return;
     const { x, y } = getPos(e);
     setDrawing({ ...drawing, curX: x, curY: y });
   };
   const onPointerUp = () => {
+    if (dragging) {
+      setDragging(null);
+      return;
+    }
     if (!drawing) return;
     const x = Math.min(drawing.startX, drawing.curX);
     const y = Math.min(drawing.startY, drawing.curY);
@@ -225,9 +274,29 @@ export function CutContourEditor() {
     setDrawing(null);
     if (w < 0.005 || h < 0.005) return;
     const id = crypto.randomUUID();
-    setShapes((s) => [...s, { id, page: pageIndex, type: tool, layer: activeLayerId, x, y, w, h }]);
+    if (malMode) {
+      setShapes((s) => [
+        ...s,
+        { id, page: pageIndex, type: tool, guide: true, group: id, x, y, w, h },
+      ]);
+      setSelectedId(id);
+      setMalMode(false);
+      toast.success("Mal toegevoegd — plaats nu je boorgaten erop");
+      return;
+    }
+    // Hangt de nieuwe contour op een mal? Dan beweegt hij mee met die mal.
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const guide = shapes
+      .filter((s) => s.guide && s.page === pageIndex)
+      .find((s) => cx >= s.x && cx <= s.x + s.w && cy >= s.y && cy <= s.y + s.h);
+    setShapes((s) => [
+      ...s,
+      { id, page: pageIndex, type: tool, layer: activeLayerId, group: guide?.group, x, y, w, h },
+    ]);
     setSelectedId(id);
   };
+
 
   const pageShapes = shapes.filter((s) => s.page === pageIndex);
   const selected = shapes.find((s) => s.id === selectedId) ?? null;
