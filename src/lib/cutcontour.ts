@@ -83,9 +83,13 @@ export async function addCutContour(
   const pages = pdfDoc.getPages();
   const catalog = pdfDoc.catalog;
 
+  // Mal-hulpvormen worden nooit geëxporteerd.
+  shapes = shapes.filter((s) => !s.guide);
+
   const usedLayerIds = new Set(shapes.map((s) => s.layer || DEFAULT_CUT_LAYER_ID));
   const activeLayers = layers.filter((l) => usedLayerIds.has(l.id));
   if (activeLayers.length === 0) return await pdfDoc.save();
+
 
   // Per laag: separation colorspace + OCG (één keer per document)
   const sepRefs = new Map<string, PDFRef>();
