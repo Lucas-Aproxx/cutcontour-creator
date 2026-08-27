@@ -118,6 +118,92 @@ export function PdfCropper() {
       setStatus("Bestand opbouwen…");
       setProgress(90);
       const out = await doc.save();
+      download(out, fileName.replace(/\.pdf$/i, "") + `-${fmt(targetW)}x${fmt(targetH)}mm.pdf`);
+      setProgress(100);
+      setStatus("Klaar — bijgesneden PDF gedownload");
+      toast.success("Bijgesneden PDF gedownload");
+    } catch (e) {
+      console.error(e);
+      toast.error("Bijsnijden mislukt");
+      setStatus("Mislukt");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Maakt de inhoud groter: schaalt elke pagina op naar het doelformaat, centraal. */
+  const enlarge = async () => {
+    if (!bytes) return;
+    if (!(targetW > 0) || !(targetH > 0)) {
+      toast.error("Geef een geldige breedte en hoogte in mm");
+      return;
+    }
+    setBusy(true);
+    setProgress(5);
+    setStatus("PDF inlezen…");
+    try {
+      const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const outDoc = await PDFDocument.create();
+      const wPt = toPt(targetW);
+      const hPt = toPt(targetH);
+      const srcPages = src.getPages();
+
+      for (let i = 0; i < srcPages.length; i++) {
+        setStatus(`Pagina ${i + 1} van ${srcPages.length} vergroten…`);
+        setProgress(10 + Math.round(((i + 1) / srcPages.length) * 75));
+
+        const { width: srcW, height: srcH } = srcPages[i].getSize();
+        const embedded = await outDoc.embedPage(srcPages[i]);
+        // Schaalt uniform zodat de inhoud het doelformaat volledig vult (cover),
+        // overloop aan twee zijden wordt gelijkmatig weggesneden — centraal.
+        const scale = Math.max(wPt / srcW, hPt / srcH);
+        const drawW = srcW * scale;
+        const drawH = srcH * scale;
+        const page = outDoc.addPage([wPt, hPt]);
+        page.drawPage(embedded, {
+          x: (wPt - drawW) / 2,
+          y: (hPt - drawH) / 2,
+          width: drawW,
+          height: drawH,
+        });
+      }
+
+      setStatus("Bestand opbouwen…");
+      setProgress(90);
+      const out = await outDoc.save();
+      download(out, fileName.replace(/\.pdf$/i, "") + `-vergroot-${fmt(targetW)}x${fmt(targetH)}mm.pdf`);
+      setProgress(100);
+      setStatus("Klaar — vergrote PDF gedownload");
+      toast.success("Vergrote PDF gedownload");
+    } catch (e) {
+      console.error(e);
+      toast.error("Vergroten mislukt");
+      setStatus("Mislukt");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  function download(out: Uint8Array, name: string) {
+    const blob = new Blob([out as unknown as BlobPart], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const _old = async () => {
+    if (!bytes) return;
+    setBusy(true);
+    setProgress(5);
+    setStatus("PDF inlezen…");
+    try {
+      const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      setStatus("Bestand opbouwen…");
+      setProgress(90);
+      const out = await doc.save();
       const blob = new Blob([out as unknown as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
