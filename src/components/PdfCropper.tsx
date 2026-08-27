@@ -255,20 +255,22 @@ export function PdfCropper() {
 
           <div className="text-sm text-muted-foreground space-y-1">
             <p>
-              Weg aan links/rechts: <strong>{fmt(Math.max(trimW, 0))} mm</strong> per zijde · weg aan
-              boven/onder: <strong>{fmt(Math.max(trimH, 0))} mm</strong> per zijde.
+              <strong>Bijsnijden:</strong> weg aan links/rechts {fmt(Math.max(trimW, 0))} mm · boven/onder{" "}
+              {fmt(Math.max(trimH, 0))} mm per zijde (inhoud blijft op ware grootte).
             </p>
-            {(trimW < 0 || trimH < 0) && (
-              <p className="text-destructive">
-                Let op: het gevraagde formaat is groter dan het bestand — de pagina wordt dan
-                uitgebreid met leeg gebied in plaats van bijgesneden.
-              </p>
-            )}
+            <p>
+              <strong>Vergroten/verkleinen:</strong> de inhoud wordt met factor{" "}
+              <strong>{(Math.round(scaleFactor * 1000) / 1000).toString().replace(".", ",")}×</strong>{" "}
+              geschaald zodat het volledige formaat gevuld is en centraal blijft staan.
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button onClick={crop} disabled={busy}>
               <Crop className="w-4 h-4 mr-1" /> Bijsnijden en downloaden
+            </Button>
+            <Button onClick={enlarge} disabled={busy} variant="secondary">
+              <Maximize2 className="w-4 h-4 mr-1" /> Vergroten en downloaden
             </Button>
             {!busy && progress === 100 && (
               <span className="text-sm text-muted-foreground flex items-center gap-1">
@@ -276,6 +278,7 @@ export function PdfCropper() {
               </span>
             )}
           </div>
+
 
           {(busy || (progress > 0 && progress < 100)) && (
             <div className="space-y-1">
