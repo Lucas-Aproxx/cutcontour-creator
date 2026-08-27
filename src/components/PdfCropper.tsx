@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Crop, Download, Upload } from "lucide-react";
+import { Crop, Download, Maximize2, Upload } from "lucide-react";
 
 const PT_PER_MM = 72 / 25.4;
 const toMm = (pt: number) => pt / PT_PER_MM;
@@ -200,6 +200,7 @@ export function PdfCropper() {
   const first = pages[0];
   const trimW = first ? (first.widthMm - targetW) / 2 : 0;
   const trimH = first ? (first.heightMm - targetH) / 2 : 0;
+  const scaleFactor = first ? Math.max(targetW / first.widthMm, targetH / first.heightMm) : 1;
 
   return (
     <div className="max-w-3xl mx-auto px-3 sm:px-4 py-6 space-y-6">
@@ -207,7 +208,7 @@ export function PdfCropper() {
         <h1 className="text-2xl font-semibold tracking-tight">PDF bijsnijden</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Geef het gewenste formaat in millimeter op. Het bestand wordt aan alle zijden gelijk
-          bijgesneden zodat het ontwerp centraal blijft staan.
+          bijgesneden, of net vergroot naar dat formaat — het ontwerp blijft altijd centraal staan.
         </p>
       </div>
 
