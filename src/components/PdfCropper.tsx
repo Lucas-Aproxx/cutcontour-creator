@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Crop, Download, Upload } from "lucide-react";
+import { Crop, Download, Maximize2, Upload } from "lucide-react";
 
 const PT_PER_MM = 72 / 25.4;
 const toMm = (pt: number) => pt / PT_PER_MM;
@@ -118,13 +118,7 @@ export function PdfCropper() {
       setStatus("Bestand opbouwen…");
       setProgress(90);
       const out = await doc.save();
-      const blob = new Blob([out as unknown as BlobPart], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName.replace(/\.pdf$/i, "") + `-${fmt(targetW)}x${fmt(targetH)}mm.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      download(out, fileName.replace(/\.pdf$/i, "") + `-${fmt(targetW)}x${fmt(targetH)}mm.pdf`);
       setProgress(100);
       setStatus("Klaar — bijgesneden PDF gedownload");
       toast.success("Bijgesneden PDF gedownload");
@@ -137,9 +131,76 @@ export function PdfCropper() {
     }
   };
 
+  /** Maakt de inhoud groter: schaalt elke pagina op naar het doelformaat, centraal. */
+  const enlarge = async () => {
+    if (!bytes) return;
+    if (!(targetW > 0) || !(targetH > 0)) {
+      toast.error("Geef een geldige breedte en hoogte in mm");
+      return;
+    }
+    setBusy(true);
+    setProgress(5);
+    setStatus("PDF inlezen…");
+    try {
+      const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+      const outDoc = await PDFDocument.create();
+      const wPt = toPt(targetW);
+      const hPt = toPt(targetH);
+      const srcPages = src.getPages();
+
+      for (let i = 0; i < srcPages.length; i++) {
+        setStatus(`Pagina ${i + 1} van ${srcPages.length} vergroten…`);
+        setProgress(10 + Math.round(((i + 1) / srcPages.length) * 75));
+
+        const { width: srcW, height: srcH } = srcPages[i].getSize();
+        const embedded = await outDoc.embedPage(srcPages[i]);
+        // Schaalt uniform zodat de inhoud het doelformaat volledig vult (cover),
+        // overloop aan twee zijden wordt gelijkmatig weggesneden — centraal.
+        const scale = Math.max(wPt / srcW, hPt / srcH);
+        const drawW = srcW * scale;
+        const drawH = srcH * scale;
+        const page = outDoc.addPage([wPt, hPt]);
+        page.drawPage(embedded, {
+          x: (wPt - drawW) / 2,
+          y: (hPt - drawH) / 2,
+          width: drawW,
+          height: drawH,
+        });
+      }
+
+      setStatus("Bestand opbouwen…");
+      setProgress(90);
+      const out = await outDoc.save();
+      download(out, fileName.replace(/\.pdf$/i, "") + `-vergroot-${fmt(targetW)}x${fmt(targetH)}mm.pdf`);
+      setProgress(100);
+      setStatus("Klaar — vergrote PDF gedownload");
+      toast.success("Vergrote PDF gedownload");
+    } catch (e) {
+      console.error(e);
+      toast.error("Vergroten mislukt");
+      setStatus("Mislukt");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  function download(out: Uint8Array, name: string) {
+    const blob = new Blob([out as unknown as BlobPart], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+
+
+
   const first = pages[0];
   const trimW = first ? (first.widthMm - targetW) / 2 : 0;
   const trimH = first ? (first.heightMm - targetH) / 2 : 0;
+  const scaleFactor = first ? Math.max(targetW / first.widthMm, targetH / first.heightMm) : 1;
 
   return (
     <div className="max-w-3xl mx-auto px-3 sm:px-4 py-6 space-y-6">
@@ -147,7 +208,7 @@ export function PdfCropper() {
         <h1 className="text-2xl font-semibold tracking-tight">PDF bijsnijden</h1>
         <p className="text-muted-foreground text-sm mt-1">
           Geef het gewenste formaat in millimeter op. Het bestand wordt aan alle zijden gelijk
-          bijgesneden zodat het ontwerp centraal blijft staan.
+          bijgesneden, of net vergroot naar dat formaat — het ontwerp blijft altijd centraal staan.
         </p>
       </div>
 
@@ -195,20 +256,22 @@ export function PdfCropper() {
 
           <div className="text-sm text-muted-foreground space-y-1">
             <p>
-              Weg aan links/rechts: <strong>{fmt(Math.max(trimW, 0))} mm</strong> per zijde · weg aan
-              boven/onder: <strong>{fmt(Math.max(trimH, 0))} mm</strong> per zijde.
+              <strong>Bijsnijden:</strong> weg aan links/rechts {fmt(Math.max(trimW, 0))} mm · boven/onder{" "}
+              {fmt(Math.max(trimH, 0))} mm per zijde (inhoud blijft op ware grootte).
             </p>
-            {(trimW < 0 || trimH < 0) && (
-              <p className="text-destructive">
-                Let op: het gevraagde formaat is groter dan het bestand — de pagina wordt dan
-                uitgebreid met leeg gebied in plaats van bijgesneden.
-              </p>
-            )}
+            <p>
+              <strong>Vergroten/verkleinen:</strong> de inhoud wordt met factor{" "}
+              <strong>{(Math.round(scaleFactor * 1000) / 1000).toString().replace(".", ",")}×</strong>{" "}
+              geschaald zodat het volledige formaat gevuld is en centraal blijft staan.
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button onClick={crop} disabled={busy}>
               <Crop className="w-4 h-4 mr-1" /> Bijsnijden en downloaden
+            </Button>
+            <Button onClick={enlarge} disabled={busy} variant="secondary">
+              <Maximize2 className="w-4 h-4 mr-1" /> Vergroten en downloaden
             </Button>
             {!busy && progress === 100 && (
               <span className="text-sm text-muted-foreground flex items-center gap-1">
@@ -216,6 +279,7 @@ export function PdfCropper() {
               </span>
             )}
           </div>
+
 
           {(busy || (progress > 0 && progress < 100)) && (
             <div className="space-y-1">
