@@ -194,34 +194,8 @@ export function PdfCropper() {
     URL.revokeObjectURL(url);
   }
 
-  const _old = async () => {
-    if (!bytes) return;
-    setBusy(true);
-    setProgress(5);
-    setStatus("PDF inlezen…");
-    try {
-      const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
-      setStatus("Bestand opbouwen…");
-      setProgress(90);
-      const out = await doc.save();
-      const blob = new Blob([out as unknown as BlobPart], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName.replace(/\.pdf$/i, "") + `-${fmt(targetW)}x${fmt(targetH)}mm.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setProgress(100);
-      setStatus("Klaar — bijgesneden PDF gedownload");
-      toast.success("Bijgesneden PDF gedownload");
-    } catch (e) {
-      console.error(e);
-      toast.error("Bijsnijden mislukt");
-      setStatus("Mislukt");
-    } finally {
-      setBusy(false);
-    }
-  };
+
+
 
   const first = pages[0];
   const trimW = first ? (first.widthMm - targetW) / 2 : 0;
