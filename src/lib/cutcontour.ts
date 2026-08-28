@@ -156,7 +156,34 @@ export async function addCutContour(
   for (const [pageIdx, pageShapes] of byPage) {
     const page = pages[pageIdx];
     if (!page) continue;
-    const { width: pw, height: ph } = page.getSize();
+
+    // De editor toont de pagina volgens de CropBox (zoals viewers doen) en met
+    // de rotatie van de pagina. Exporteren moet dus in exact diezelfde ruimte
+    // gebeuren, anders staan de contouren verschoven bij bestanden met een
+    // CropBox-offset (bv. eerder bijgesneden PDF's) of met rotatie.
+    let box: { x: number; y: number; width: number; height: number };
+    try {
+      box = page.getCropBox();
+    } catch {
+      box = page.getMediaBox();
+    }
+    if (!box || !(box.width > 0) || !(box.height > 0)) box = page.getMediaBox();
+
+    const rot = ((page.getRotation().angle % 360) + 360) % 360;
+    const swap = rot === 90 || rot === 270;
+    // Zichtbare (viewport) afmetingen zoals in de editor
+    const pw = swap ? box.height : box.width;
+    const ph = swap ? box.width : box.height;
+
+    // Matrix die viewport-coördinaten (origin linksonder) omzet naar user space
+    const cm =
+      rot === 90
+        ? `0 1 -1 0 ${fmt(box.x + box.width)} ${fmt(box.y)} cm`
+        : rot === 180
+          ? `-1 0 0 -1 ${fmt(box.x + box.width)} ${fmt(box.y + box.height)} cm`
+          : rot === 270
+            ? `0 -1 1 0 ${fmt(box.x)} ${fmt(box.y + box.height)} cm`
+            : `1 0 0 1 ${fmt(box.x)} ${fmt(box.y)} cm`;
 
     const resources = page.node.Resources() ?? pdfDoc.context.obj({});
     let csDict = resources.lookup(PDFName.of("ColorSpace")) as any;
@@ -181,13 +208,14 @@ export async function addCutContour(
       csDict.set(PDFName.of(`CS_${key}`), sepRefs.get(layer.id)!);
       propsDict.set(PDFName.of(`OC_${key}`), ocgRefs.get(layer.id)!);
 
-      const ops: string[] = ["q", `/CS_${key} CS`, "1 SCN", "0.25 w"];
+      const ops: string[] = ["q", cm, `/CS_${key} CS`, "1 SCN", "0.25 w"];
       for (const s of layerShapes) {
         const x = s.x * pw;
         const yTop = s.y * ph;
         const w = s.w * pw;
         const h = s.h * ph;
         const y = ph - yTop - h;
+
 
         if (s.type === "rect") {
           ops.push(`${fmt(x)} ${fmt(y)} ${fmt(w)} ${fmt(h)} re S`);
