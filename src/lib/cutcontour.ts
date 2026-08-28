@@ -175,15 +175,18 @@ export async function addCutContour(
     const pw = swap ? box.height : box.width;
     const ph = swap ? box.width : box.height;
 
-    // Matrix die viewport-coördinaten (origin linksonder) omzet naar user space
+    // Exacte inverse van de PDF.js-viewporttransformatie. De editor bewaart
+    // coördinaten vanaf linksboven; deze matrix zet die rechtstreeks om naar
+    // PDF user space. Dit voorkomt dat boorgaten bij geroteerde pagina's na
+    // export verschuiven of gespiegeld terechtkomen.
     const cm =
       rot === 90
-        ? `0 1 -1 0 ${fmt(box.x + box.width)} ${fmt(box.y)} cm`
+        ? `0 1 1 0 ${fmt(box.x)} ${fmt(box.y)} cm`
         : rot === 180
-          ? `-1 0 0 -1 ${fmt(box.x + box.width)} ${fmt(box.y + box.height)} cm`
+          ? `-1 0 0 1 ${fmt(box.x + box.width)} ${fmt(box.y)} cm`
           : rot === 270
-            ? `0 -1 1 0 ${fmt(box.x)} ${fmt(box.y + box.height)} cm`
-            : `1 0 0 1 ${fmt(box.x)} ${fmt(box.y)} cm`;
+            ? `0 -1 -1 0 ${fmt(box.x + box.width)} ${fmt(box.y + box.height)} cm`
+            : `1 0 0 -1 ${fmt(box.x)} ${fmt(box.y + box.height)} cm`;
 
     const resources = page.node.Resources() ?? pdfDoc.context.obj({});
     let csDict = resources.lookup(PDFName.of("ColorSpace")) as any;
@@ -214,15 +217,14 @@ export async function addCutContour(
         const yTop = s.y * ph;
         const w = s.w * pw;
         const h = s.h * ph;
-        const y = ph - yTop - h;
 
 
         if (s.type === "rect") {
-          ops.push(`${fmt(x)} ${fmt(y)} ${fmt(w)} ${fmt(h)} re S`);
+          ops.push(`${fmt(x)} ${fmt(yTop)} ${fmt(w)} ${fmt(h)} re S`);
         } else {
           const kappa = 0.5522847498;
           const cx = x + w / 2;
-          const cy = y + h / 2;
+          const cy = yTop + h / 2;
           const rx = w / 2;
           const ry = h / 2;
           const ox = rx * kappa;
