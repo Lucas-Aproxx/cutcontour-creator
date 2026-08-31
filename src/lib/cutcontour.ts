@@ -1,4 +1,4 @@
-import { PDFDocument, PDFName, PDFRef } from "pdf-lib";
+import { PDFDocument, PDFName, PDFRef, PDFString } from "pdf-lib";
 
 export type ShapeType = "rect" | "ellipse";
 
