@@ -141,8 +141,10 @@ export async function addCutContour(
     sepRefs.set(layer.id, pdfDoc.context.register(sepArray));
 
     const ocgDict = pdfDoc.context.obj({
-      Type: "OCG",
-      Name: layer.name,
+      Type: PDFName.of("OCG"),
+      // /Name moet een echte PDF-string zijn (geen naam-object), anders geeft
+      // Illustrator/Acrobat "Expected a string object".
+      Name: PDFString.of(layer.name),
       Intent: [PDFName.of("View"), PDFName.of("Design")],
     });
     ocgRefs.set(layer.id, pdfDoc.context.register(ocgDict));
