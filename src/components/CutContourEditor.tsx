@@ -11,6 +11,8 @@ import {
   DEFAULT_CUT_LAYERS,
   DEFAULT_CUT_LAYER_ID,
   layerPreviewColor,
+  rotationInfo,
+  rotatePoint,
   type CutLayer,
   type CutShape,
   type ShapeType,
@@ -215,11 +217,22 @@ export function CutContourEditor() {
   };
 
   const hitTest = (list: CutShape[], x: number, y: number): CutShape | null => {
+    const W = pageDims.width || 1;
+    const H = pageDims.height || 1;
     const inside = (s: CutShape) => {
-      if (x < s.x || x > s.x + s.w || y < s.y || y > s.y + s.h) return false;
+      // Bij een geroteerde mal het testpunt terugdraaien naar de niet-geroteerde ruimte.
+      let px = x;
+      let py = y;
+      const ri = rotationInfo(s, list);
+      if (ri) {
+        const p = rotatePoint(x * W, y * H, ri.gx * W, ri.gy * H, -ri.deg);
+        px = p.x / W;
+        py = p.y / H;
+      }
+      if (px < s.x || px > s.x + s.w || py < s.y || py > s.y + s.h) return false;
       if (s.type === "ellipse") {
-        const nx = (x - (s.x + s.w / 2)) / (s.w / 2 || 1);
-        const ny = (y - (s.y + s.h / 2)) / (s.h / 2 || 1);
+        const nx = (px - (s.x + s.w / 2)) / (s.w / 2 || 1);
+        const ny = (py - (s.y + s.h / 2)) / (s.h / 2 || 1);
         return nx * nx + ny * ny <= 1;
       }
       return true;
@@ -371,6 +384,13 @@ export function CutContourEditor() {
     );
   };
 
+  /** Zet de rotatie (0..360°) van de geselecteerde mal. */
+  const setGuideRotation = (deg: number) => {
+    if (!selected || !selected.guide) return;
+    const val = Number.isFinite(deg) ? ((deg % 360) + 360) % 360 : 0;
+    setShapes((all) => all.map((s) => (s.id === selected.id ? { ...s, rot: val } : s)));
+  };
+
 
   const handleExport = async () => {
     if (!fileBytes) return;
@@ -442,8 +462,18 @@ export function CutContourEditor() {
           const h = s.h * canvas.height;
           const isEllipse = s.type === "ellipse";
 
+          // rotatie van de mal waarop dit boorgat staat
+          const ri = rotationInfo(s, shapes);
+          const rad = ((ri?.deg ?? 0) * Math.PI) / 180;
+
           // shape outline in de kleur van zijn laag
           const shapeColor = colorOfLayer(layerOf(s));
+          ctx.save();
+          if (ri) {
+            ctx.translate(ri.gx * canvas.width, ri.gy * canvas.height);
+            ctx.rotate(rad);
+            ctx.translate(-ri.gx * canvas.width, -ri.gy * canvas.height);
+          }
           ctx.strokeStyle = shapeColor;
           ctx.beginPath();
           if (isEllipse) {
@@ -452,10 +482,20 @@ export function CutContourEditor() {
             ctx.rect(x, y, w, h);
           }
           ctx.stroke();
+          ctx.restore();
 
-          // crosshair at the exact center of every shape
-          const refX = x + w / 2;
-          const refY = y + h / 2;
+          // crosshair at the exact center of every shape (na rotatie)
+          const center = ri
+            ? rotatePoint(
+                x + w / 2,
+                y + h / 2,
+                ri.gx * canvas.width,
+                ri.gy * canvas.height,
+                ri.deg,
+              )
+            : { x: x + w / 2, y: y + h / 2 };
+          const refX = center.x;
+          const refY = center.y;
           ctx.strokeStyle = "#2563eb";
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -469,8 +509,8 @@ export function CutContourEditor() {
           // values in mm — X = center from left; Y = center from top of page
           const wmm = s.w * pWmm;
           const hmm = s.h * pHmm;
-          const xmm = s.x * pWmm + wmm / 2;
-          const ymm = s.y * pHmm + hmm / 2;
+          const xmm = (refX / canvas.width) * pWmm;
+          const ymm = (refY / canvas.height) * pHmm;
           const label = [
             `#${idx + 1} ${isEllipse ? "⌀" : "▭"} · ${layerById(layerOf(s))?.name ?? "Cutcontour"}`,
             `X: ${xmm.toFixed(2)} mm`,
@@ -967,7 +1007,9 @@ export function CutContourEditor() {
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
                 >
-                  {pageShapes.map((s) => (
+                  {pageShapes.map((s) => {
+                    const ri = rotationInfo(s, shapes);
+                    return (
                     <div
                       key={s.id}
                       className={s.guide ? "absolute border-2 border-dashed" : "absolute border-2"}
@@ -977,6 +1019,10 @@ export function CutContourEditor() {
                         top: s.y * 100 + "%",
                         width: s.w * 100 + "%",
                         height: s.h * 100 + "%",
+                        transform: ri ? `rotate(${ri.deg}deg)` : undefined,
+                        transformOrigin: ri
+                          ? `${((ri.gx - s.x) / (s.w || 1)) * 100}% ${((ri.gy - s.y) / (s.h || 1)) * 100}%`
+                          : undefined,
                         borderColor: selectedId === s.id
                           ? "oklch(0.7 0.3 30)"
                           : s.guide
@@ -987,7 +1033,8 @@ export function CutContourEditor() {
                         boxShadow: selectedId === s.id ? "0 0 0 2px oklch(0.7 0.3 30 / 0.3)" : undefined,
                       }}
                     />
-                  ))}
+                    );
+                  })}
                   {rectPreview && (
                     <div
                       className="absolute border-2 border-dashed pointer-events-none"
@@ -1115,6 +1162,51 @@ export function CutContourEditor() {
                   <MmInput value={selHmm} onCommit={(n) => updateSelectedMm({ hMm: n })} />
                 </div>
               </div>
+              {selected.guide && (
+                <div className="space-y-2 rounded-lg bg-muted/50 p-2">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Rotatie (°)</Label>
+                    <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                      {(selected.rot ?? 0).toFixed(1)}°
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={360}
+                    step={0.5}
+                    value={selected.rot ?? 0}
+                    onChange={(e) => setGuideRotation(Number(e.target.value))}
+                    className="w-full accent-primary"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={360}
+                      step={0.5}
+                      value={selected.rot ?? 0}
+                      onChange={(e) => setGuideRotation(Number(e.target.value))}
+                      className="h-8"
+                    />
+                    {[0, 45, 90, 180, 270].map((d) => (
+                      <Button
+                        key={d}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => setGuideRotation(d)}
+                      >
+                        {d}°
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    De mal draait rond zijn middelpunt; de boorgaten erop draaien mee en behouden hun
+                    onderlinge positie — ook in de gedownloade PDF.
+                  </p>
+                </div>
+              )}
               {selected.guide ? (
                 <Button
                   size="sm"

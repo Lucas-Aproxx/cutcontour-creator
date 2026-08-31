@@ -15,11 +15,35 @@ export interface CutShape {
   guide?: boolean;
   /** Id van de mal waar deze vorm aan vasthangt (beweegt samen mee). */
   group?: string;
+  /** Rotatie van de mal in graden (0..360), enkel op de mal zelf bewaard. */
+  rot?: number;
   // Normalized coordinates (0..1) relative to page width/height, origin top-left
   x: number;
   y: number;
   w: number;
   h: number;
+}
+
+/**
+ * Geeft de rotatie terug die op een vorm van toepassing is: de rotatie van de
+ * mal waar de vorm aan vasthangt (of van de mal zelf). Centrum in genormaliseerde
+ * coördinaten.
+ */
+export function rotationInfo(
+  s: CutShape,
+  all: CutShape[],
+): { deg: number; gx: number; gy: number } | null {
+  const g = s.guide ? s : s.group ? all.find((x) => x.guide && x.group === s.group) : undefined;
+  if (!g || !g.rot) return null;
+  return { deg: g.rot, gx: g.x + g.w / 2, gy: g.y + g.h / 2 };
+}
+
+/** Roteert een punt (kloksgewijs in een y-omlaag ruimte) rond een centrum. */
+export function rotatePoint(x: number, y: number, cx: number, cy: number, deg: number) {
+  const a = (deg * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: cx + (x - cx) * c - (y - cy) * s, y: cy + (x - cx) * s + (y - cy) * c };
 }
 
 
@@ -83,7 +107,9 @@ export async function addCutContour(
   const pages = pdfDoc.getPages();
   const catalog = pdfDoc.catalog;
 
-  // Mal-hulpvormen worden nooit geëxporteerd.
+  // Mal-hulpvormen worden nooit geëxporteerd, maar hun rotatie wel toegepast
+  // op de boorgaten die eraan vasthangen.
+  const allShapes = shapes;
   shapes = shapes.filter((s) => !s.guide);
 
   const usedLayerIds = new Set(shapes.map((s) => s.layer || DEFAULT_CUT_LAYER_ID));
@@ -218,6 +244,21 @@ export async function addCutContour(
         const w = s.w * pw;
         const h = s.h * ph;
 
+        // Rotatie van de mal waarop dit boorgat staat.
+        const rotInfo = rotationInfo(s, allShapes);
+        if (rotInfo) {
+          const a = (rotInfo.deg * Math.PI) / 180;
+          const c = Math.cos(a);
+          const sn = Math.sin(a);
+          const gx = rotInfo.gx * pw;
+          const gy = rotInfo.gy * ph;
+          const e = gx - c * gx + sn * gy;
+          const f = gy - sn * gx - c * gy;
+          ops.push("q", `${fmt(c)} ${fmt(sn)} ${fmt(-sn)} ${fmt(c)} ${fmt(e)} ${fmt(f)} cm`);
+        }
+
+
+
 
         if (s.type === "rect") {
           ops.push(`${fmt(x)} ${fmt(yTop)} ${fmt(w)} ${fmt(h)} re S`);
@@ -244,6 +285,7 @@ export async function addCutContour(
           );
           ops.push("S");
         }
+        if (rotInfo) ops.push("Q");
       }
       ops.push("Q");
 
