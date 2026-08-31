@@ -967,7 +967,9 @@ export function CutContourEditor() {
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
                 >
-                  {pageShapes.map((s) => (
+                  {pageShapes.map((s) => {
+                    const ri = rotationInfo(s, shapes);
+                    return (
                     <div
                       key={s.id}
                       className={s.guide ? "absolute border-2 border-dashed" : "absolute border-2"}
@@ -977,6 +979,10 @@ export function CutContourEditor() {
                         top: s.y * 100 + "%",
                         width: s.w * 100 + "%",
                         height: s.h * 100 + "%",
+                        transform: ri ? `rotate(${ri.deg}deg)` : undefined,
+                        transformOrigin: ri
+                          ? `${((ri.gx - s.x) / (s.w || 1)) * 100}% ${((ri.gy - s.y) / (s.h || 1)) * 100}%`
+                          : undefined,
                         borderColor: selectedId === s.id
                           ? "oklch(0.7 0.3 30)"
                           : s.guide
@@ -987,7 +993,8 @@ export function CutContourEditor() {
                         boxShadow: selectedId === s.id ? "0 0 0 2px oklch(0.7 0.3 30 / 0.3)" : undefined,
                       }}
                     />
-                  ))}
+                    );
+                  })}
                   {rectPreview && (
                     <div
                       className="absolute border-2 border-dashed pointer-events-none"
