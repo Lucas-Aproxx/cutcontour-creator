@@ -285,6 +285,7 @@ export async function addCutContour(
           );
           ops.push("S");
         }
+        if (rotInfo) ops.push("Q");
       }
       ops.push("Q");
 
