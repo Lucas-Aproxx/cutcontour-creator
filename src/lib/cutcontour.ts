@@ -1,4 +1,4 @@
-import { PDFDocument, PDFName, PDFRef } from "pdf-lib";
+import { PDFDocument, PDFName, PDFRef, PDFString } from "pdf-lib";
 
 export type ShapeType = "rect" | "ellipse";
 
@@ -141,8 +141,10 @@ export async function addCutContour(
     sepRefs.set(layer.id, pdfDoc.context.register(sepArray));
 
     const ocgDict = pdfDoc.context.obj({
-      Type: "OCG",
-      Name: layer.name,
+      Type: PDFName.of("OCG"),
+      // /Name moet een echte PDF-string zijn (geen naam-object), anders geeft
+      // Illustrator/Acrobat "Expected a string object".
+      Name: PDFString.of(layer.name),
       Intent: [PDFName.of("View"), PDFName.of("Design")],
     });
     ocgRefs.set(layer.id, pdfDoc.context.register(ocgDict));
@@ -314,9 +316,9 @@ export async function addCutContour(
     const outputIntent = pdfDoc.context.obj({
       Type: PDFName.of("OutputIntent"),
       S: PDFName.of("GTS_PDFX"),
-      OutputConditionIdentifier: "CGATS TR 001",
-      RegistryName: "http://www.color.org",
-      Info: "CGATS TR 001 (SWOP)",
+      OutputConditionIdentifier: PDFString.of("CGATS TR 001"),
+      RegistryName: PDFString.of("http://www.color.org"),
+      Info: PDFString.of("CGATS TR 001 (SWOP)"),
     });
     const oiRef = pdfDoc.context.register(outputIntent);
     const existing = catalog.lookup(PDFName.of("OutputIntents")) as any;
