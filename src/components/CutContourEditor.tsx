@@ -384,6 +384,13 @@ export function CutContourEditor() {
     );
   };
 
+  /** Zet de rotatie (0..360°) van de geselecteerde mal. */
+  const setGuideRotation = (deg: number) => {
+    if (!selected || !selected.guide) return;
+    const val = Number.isFinite(deg) ? ((deg % 360) + 360) % 360 : 0;
+    setShapes((all) => all.map((s) => (s.id === selected.id ? { ...s, rot: val } : s)));
+  };
+
 
   const handleExport = async () => {
     if (!fileBytes) return;
