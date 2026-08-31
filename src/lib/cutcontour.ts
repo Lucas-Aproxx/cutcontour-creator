@@ -316,9 +316,9 @@ export async function addCutContour(
     const outputIntent = pdfDoc.context.obj({
       Type: PDFName.of("OutputIntent"),
       S: PDFName.of("GTS_PDFX"),
-      OutputConditionIdentifier: "CGATS TR 001",
-      RegistryName: "http://www.color.org",
-      Info: "CGATS TR 001 (SWOP)",
+      OutputConditionIdentifier: PDFString.of("CGATS TR 001"),
+      RegistryName: PDFString.of("http://www.color.org"),
+      Info: PDFString.of("CGATS TR 001 (SWOP)"),
     });
     const oiRef = pdfDoc.context.register(outputIntent);
     const existing = catalog.lookup(PDFName.of("OutputIntents")) as any;
