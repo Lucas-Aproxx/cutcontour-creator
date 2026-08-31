@@ -11,6 +11,8 @@ import {
   DEFAULT_CUT_LAYERS,
   DEFAULT_CUT_LAYER_ID,
   layerPreviewColor,
+  rotationInfo,
+  rotatePoint,
   type CutLayer,
   type CutShape,
   type ShapeType,
