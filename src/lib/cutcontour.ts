@@ -15,11 +15,35 @@ export interface CutShape {
   guide?: boolean;
   /** Id van de mal waar deze vorm aan vasthangt (beweegt samen mee). */
   group?: string;
+  /** Rotatie van de mal in graden (0..360), enkel op de mal zelf bewaard. */
+  rot?: number;
   // Normalized coordinates (0..1) relative to page width/height, origin top-left
   x: number;
   y: number;
   w: number;
   h: number;
+}
+
+/**
+ * Geeft de rotatie terug die op een vorm van toepassing is: de rotatie van de
+ * mal waar de vorm aan vasthangt (of van de mal zelf). Centrum in genormaliseerde
+ * coördinaten.
+ */
+export function rotationInfo(
+  s: CutShape,
+  all: CutShape[],
+): { deg: number; gx: number; gy: number } | null {
+  const g = s.guide ? s : s.group ? all.find((x) => x.guide && x.group === s.group) : undefined;
+  if (!g || !g.rot) return null;
+  return { deg: g.rot, gx: g.x + g.w / 2, gy: g.y + g.h / 2 };
+}
+
+/** Roteert een punt (kloksgewijs in een y-omlaag ruimte) rond een centrum. */
+export function rotatePoint(x: number, y: number, cx: number, cy: number, deg: number) {
+  const a = (deg * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: cx + (x - cx) * c - (y - cy) * s, y: cy + (x - cx) * s + (y - cy) * c };
 }
 
 
