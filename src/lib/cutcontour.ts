@@ -244,6 +244,21 @@ export async function addCutContour(
         const w = s.w * pw;
         const h = s.h * ph;
 
+        // Rotatie van de mal waarop dit boorgat staat.
+        const rotInfo = rotationInfo(s, allShapes);
+        if (rotInfo) {
+          const a = (rotInfo.deg * Math.PI) / 180;
+          const c = Math.cos(a);
+          const sn = Math.sin(a);
+          const gx = rotInfo.gx * pw;
+          const gy = rotInfo.gy * ph;
+          const e = gx - c * gx + sn * gy;
+          const f = gy - sn * gx - c * gy;
+          ops.push("q", `${fmt(c)} ${fmt(sn)} ${fmt(-sn)} ${fmt(c)} ${fmt(e)} ${fmt(f)} cm`);
+        }
+
+
+
 
         if (s.type === "rect") {
           ops.push(`${fmt(x)} ${fmt(yTop)} ${fmt(w)} ${fmt(h)} re S`);
