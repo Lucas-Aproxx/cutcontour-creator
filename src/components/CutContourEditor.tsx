@@ -1135,6 +1135,51 @@ export function CutContourEditor() {
                   <MmInput value={selHmm} onCommit={(n) => updateSelectedMm({ hMm: n })} />
                 </div>
               </div>
+              {selected.guide && (
+                <div className="space-y-2 rounded-lg bg-muted/50 p-2">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Rotatie (°)</Label>
+                    <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                      {(selected.rot ?? 0).toFixed(1)}°
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={360}
+                    step={0.5}
+                    value={selected.rot ?? 0}
+                    onChange={(e) => setGuideRotation(Number(e.target.value))}
+                    className="w-full accent-primary"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={360}
+                      step={0.5}
+                      value={selected.rot ?? 0}
+                      onChange={(e) => setGuideRotation(Number(e.target.value))}
+                      className="h-8"
+                    />
+                    {[0, 45, 90, 180, 270].map((d) => (
+                      <Button
+                        key={d}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => setGuideRotation(d)}
+                      >
+                        {d}°
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    De mal draait rond zijn middelpunt; de boorgaten erop draaien mee en behouden hun
+                    onderlinge positie — ook in de gedownloade PDF.
+                  </p>
+                </div>
+              )}
               {selected.guide ? (
                 <Button
                   size="sm"
