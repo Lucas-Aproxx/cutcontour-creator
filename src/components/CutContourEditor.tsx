@@ -217,11 +217,22 @@ export function CutContourEditor() {
   };
 
   const hitTest = (list: CutShape[], x: number, y: number): CutShape | null => {
+    const W = pageDims.width || 1;
+    const H = pageDims.height || 1;
     const inside = (s: CutShape) => {
-      if (x < s.x || x > s.x + s.w || y < s.y || y > s.y + s.h) return false;
+      // Bij een geroteerde mal het testpunt terugdraaien naar de niet-geroteerde ruimte.
+      let px = x;
+      let py = y;
+      const ri = rotationInfo(s, list);
+      if (ri) {
+        const p = rotatePoint(x * W, y * H, ri.gx * W, ri.gy * H, -ri.deg);
+        px = p.x / W;
+        py = p.y / H;
+      }
+      if (px < s.x || px > s.x + s.w || py < s.y || py > s.y + s.h) return false;
       if (s.type === "ellipse") {
-        const nx = (x - (s.x + s.w / 2)) / (s.w / 2 || 1);
-        const ny = (y - (s.y + s.h / 2)) / (s.h / 2 || 1);
+        const nx = (px - (s.x + s.w / 2)) / (s.w / 2 || 1);
+        const ny = (py - (s.y + s.h / 2)) / (s.h / 2 || 1);
         return nx * nx + ny * ny <= 1;
       }
       return true;
