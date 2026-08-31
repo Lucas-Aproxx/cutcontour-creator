@@ -462,8 +462,18 @@ export function CutContourEditor() {
           const h = s.h * canvas.height;
           const isEllipse = s.type === "ellipse";
 
+          // rotatie van de mal waarop dit boorgat staat
+          const ri = rotationInfo(s, shapes);
+          const rad = ((ri?.deg ?? 0) * Math.PI) / 180;
+
           // shape outline in de kleur van zijn laag
           const shapeColor = colorOfLayer(layerOf(s));
+          ctx.save();
+          if (ri) {
+            ctx.translate(ri.gx * canvas.width, ri.gy * canvas.height);
+            ctx.rotate(rad);
+            ctx.translate(-ri.gx * canvas.width, -ri.gy * canvas.height);
+          }
           ctx.strokeStyle = shapeColor;
           ctx.beginPath();
           if (isEllipse) {
@@ -472,10 +482,20 @@ export function CutContourEditor() {
             ctx.rect(x, y, w, h);
           }
           ctx.stroke();
+          ctx.restore();
 
-          // crosshair at the exact center of every shape
-          const refX = x + w / 2;
-          const refY = y + h / 2;
+          // crosshair at the exact center of every shape (na rotatie)
+          const center = ri
+            ? rotatePoint(
+                x + w / 2,
+                y + h / 2,
+                ri.gx * canvas.width,
+                ri.gy * canvas.height,
+                ri.deg,
+              )
+            : { x: x + w / 2, y: y + h / 2 };
+          const refX = center.x;
+          const refY = center.y;
           ctx.strokeStyle = "#2563eb";
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -489,8 +509,8 @@ export function CutContourEditor() {
           // values in mm — X = center from left; Y = center from top of page
           const wmm = s.w * pWmm;
           const hmm = s.h * pHmm;
-          const xmm = s.x * pWmm + wmm / 2;
-          const ymm = s.y * pHmm + hmm / 2;
+          const xmm = (refX / canvas.width) * pWmm;
+          const ymm = (refY / canvas.height) * pHmm;
           const label = [
             `#${idx + 1} ${isEllipse ? "⌀" : "▭"} · ${layerById(layerOf(s))?.name ?? "Cutcontour"}`,
             `X: ${xmm.toFixed(2)} mm`,
