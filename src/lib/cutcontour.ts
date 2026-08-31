@@ -107,7 +107,9 @@ export async function addCutContour(
   const pages = pdfDoc.getPages();
   const catalog = pdfDoc.catalog;
 
-  // Mal-hulpvormen worden nooit geëxporteerd.
+  // Mal-hulpvormen worden nooit geëxporteerd, maar hun rotatie wel toegepast
+  // op de boorgaten die eraan vasthangen.
+  const allShapes = shapes;
   shapes = shapes.filter((s) => !s.guide);
 
   const usedLayerIds = new Set(shapes.map((s) => s.layer || DEFAULT_CUT_LAYER_ID));
